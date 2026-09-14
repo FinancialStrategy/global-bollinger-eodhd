@@ -1,5 +1,53 @@
 # Global Bollinger — EODHD Python / Colab / Netlify
 
+## v2.2 — Kullanıcının gerçek katalog dosyasına göre endeks eşleştirmesi
+
+Sekiz kayıt REVIEWED_INDICES tablosuna eklendi: GSPTSE, BVSP, SPIPSA, STOXX50E,
+AEX, IBEX, HSI, CSI300 (hepsi .INDX). Her çalıştırmada tam provider adı, para birimi,
+INDEX türü ve varsa ISIN tekrar kontrol edilir. Euro Stoxx 50 için aynı ISIN'li iki koddan
+STOXX50E açıkça seçilmiştir; fiyat geçmişlerinin aynı olduğu iddia edilmez.
+Kullanıcının universe.json içinde açık eşlemesi varsa korunur. Bu değişiklik fiyat erişimi
+değil katalog kimliği doğrulamasıdır; sekiz serinin tarihsel fiyat kalite testleri hâlâ uygulanır.
+COLCAP, FTSE MIB, JSE Top 40 yüklenen katalogda tespit edilemedi, ikame edilmedi.
+TOPIX/MERVAL kalite eşikleri gevşetilmedi. Hatalar artık gerçek tarih/fiyat bilgilerini
+gösterir; private/probes/A21.json ve A08.json ham tanı verileri içerir, API token içermez,
+site ZIP'ine konulmaz. Veri anomalilerini incelemek için kullanılabilir.
+
+## v2.1 düzeltmesi — COMM kaldırıldı, emtia adapter'i eklendi
+
+`commodities.py` dosyası ana kodla aynı dizinde olmalıdır. Eski config.json ve universe.json
+dosyalarınızı koruyabilirsiniz. Varsayılan boş emtia sembolleri, belgelenmiş reference-series
+eşlemesiyle işlenir. Kullanıcının açık provider_symbol eşlemesi varsa EOD yolunda korunur.
+
+Emtia endpoint'i `/api/commodities/historical/{CODE}`; cevap `meta` ve `data` içerir.
+WTI, Brent, doğal gaz, heating oil günlük gözlemdir; benzin haftalık; bakır, mısır, buğday,
+Arabica kahve, şeker ve pamuk aylıktır. Benzin US Regular All Formulations Gas Price,
+kahve Mild Arabica serisidir; bunlar vadeli kontrat veya sessiz proxy değildir ve provider
+adı/birimi/frekansı raporda görünür. Günlük indirme kaynak frekansını değiştirmez.
+
+Bu 11 seride fiyat/Bollinger grafikleri vardır. OHLCV bulunmadığından ATR, VWAP ve stoplu
+backtest üretilmez. Soybeans ve Cocoa belgelenmiş endpoint listesinde yoktur; UNAVAILABLE kalır.
+Altın/gümüş/platin/paladyum için FOREX kataloğunda sırasıyla XAUUSD/XAGUSD/XPTUSD/XPDUSD
+kesin kaydı aranır. Kayıt yoksa fiyat uydurulmaz. Kayıt varsa ayrıca OHLC geçmişi doğrulanır.
+Bu otomatik seçim USD spot-metal kimliğidir; LBMA fixing veya futures diye sunulmaz.
+
+## Netlify'a dosya yüklemeden Project ID alma
+
+Colab'da NETLIFY_AUTH_TOKEN secret'ını tanımlayın. Token GitHub Secrets'tan Colab'a taşınmaz.
+
+    import os, subprocess, sys
+    from google.colab import userdata
+    os.environ['NETLIFY_AUTH_TOKEN'] = userdata.get('NETLIFY_AUTH_TOKEN')
+    subprocess.run([sys.executable, 'netlify_setup.py', '--name',
+                    'global-bollinger-eodhd', '--create'], check=True)
+
+Bu komut dosya yüklemeden boş bir Netlify projesi oluşturur; aynı isimli erişilebilir proje
+varsa onun ID'sini kullanır. Birden fazla takım varsa --team TAKIM_SLUG parametresi gerekir.
+İsim başka kullanıcıda doluysa durur; otomatik farklı isim seçmez. Kodun yazdırdığı
+NETLIFY_SITE_ID değerini GitHub Actions Secrets'a ekleyin. Site adı ID değildir.
+Bu yöntemle önce manuel site ZIP'i yüklemek zorunlu değildir; ilk yayını workflow yapabilir.
+Bu dosya yalnızca sizin çalıştırmanızla proje oluşturur; bu teslimatta hesapta işlem yapılmadı.
+
 Bu paket araştırma ve günlük statik rapor üretimi içindir. Otomatik alım satım emri göndermez.
 EODHD All-In-One aboneliği kullanılır; erişim ve tüm 47 enstrümanın kapsandığı iddia edilmez.
 
@@ -25,10 +73,8 @@ katalog kaydından doldurun. Örnek şema (örnek metinleri gerçek sembol olara
     "instrument_type": "Cash Index / Spot Metal / Futures Reference",
     "volume_verified": false
 
-17 emtia ve metal slotu kayıtlıdır; spot/vadeli tercihinin kullanıcı adına otomatik yapılmaması için
-başlangıçta eşleştirilmez. COMM/FOREX EOD OHLC erişimi olmayan ürünü bu sürüm başka endpoint veya
-sağlayıcıyla ikame etmez. Farklı payload kullanan Commodities API için ayrı adapter gerekir.
-Dolayısıyla bu paket, doğrulanmış 47/47 coverage teslimatı değildir.
+17 emtia ve metal slotu kayıtlıdır. Yukarıdaki v2.1 adapter'i bunları veri türüne göre yönlendirir.
+Bu paket, hesabınızla doğrulanmış 47/47 coverage teslimatı değildir.
 
 ## Günlük otomasyon
 
