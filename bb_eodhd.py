@@ -18,7 +18,7 @@ except ImportError as exc:
 try:
     from pypfopt import risk_models, expected_returns
     from pypfopt.efficient_frontier import EfficientFrontier
-    from pypfopt.hrp import HRPOpt
+    from pypfopt.hierarchical_portfolio import HRPOpt
 except ImportError as exc:
     raise ImportError('PyPortfolioOpt is a required dependency (pip install PyPortfolioOpt). '
                       'Project policy: no fallback portfolio-risk engine exists.') from exc
