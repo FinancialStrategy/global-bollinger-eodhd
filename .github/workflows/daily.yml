@@ -49,6 +49,7 @@ jobs:
             netlify_site.zip
             private/latest_audit.json
             private/catalog.json
+            private/probes/A08.json
+            private/probes/A21.json
           if-no-files-found: ignore
           retention-days: 7
-
