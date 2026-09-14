@@ -22,7 +22,7 @@ try:
 except ImportError as exc:
     raise ImportError('PyPortfolioOpt is a required dependency (pip install PyPortfolioOpt). '
                       'Project policy: no fallback portfolio-risk engine exists.') from exc
-import inspect
+import inspect, warnings
 
 def _finite(x):
     try: x = float(x)
@@ -288,13 +288,18 @@ def metrics(eq,tr,c):
     r=eq.equity.pct_change(); r.iloc[0]=eq.equity.iloc[0]/c['capital']-1
     n=c['annual_bars']; rf=c['annual_rf']
     def q(name,*args,**kwargs):
-        try: return _finite(_qcall(getattr(qs.stats,name),*args,**kwargs))
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')  # degenerate-series warnings map to None below
+                return _finite(_qcall(getattr(qs.stats,name),*args,**kwargs))
         except Exception: return None
     pnl=tr.net_pnl if len(tr) else pd.Series(dtype=float)
+    # Anchor at the initial capital so drawdowns are measured from capital (v3 definition):
+    r_dd=pd.Series(np.concatenate([[0.0],np.asarray(r,dtype=float)]))
     return dict(
-        total_return=_finite(qs.stats.comp(r)-1),
+        total_return=_finite(qs.stats.comp(r)),
         cagr=q('cagr',r,periods=n),
-        max_drawdown=q('max_drawdown',r),
+        max_drawdown=q('max_drawdown',r_dd),
         volatility=q('volatility',r,periods=n),
         sharpe=q('sharpe',r,rf=rf,periods=n),
         sortino=q('sortino',r,rf=rf,periods=n),
@@ -305,7 +310,7 @@ def metrics(eq,tr,c):
         skew=q('skew',r),
         kurtosis=q('kurtosis',r),
         tail_ratio=q('tail_ratio',r),
-        ulcer_index=q('ulcer_index',r),
+        ulcer_index=q('ulcer_index',r_dd),
         trades=len(tr),
         win_rate=float((pnl>0).mean()) if len(pnl) else None,
         profit_factor=float(pnl[pnl>0].sum()/-pnl[pnl<0].sum()) if (pnl<0).any() else None,
