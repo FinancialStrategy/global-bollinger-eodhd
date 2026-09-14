@@ -1,0 +1,5 @@
+private/
+bb-build-*/
+netlify_site.zip
+__pycache__/
+.env
