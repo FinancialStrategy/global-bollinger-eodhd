@@ -1,1 +1,54 @@
+name: Daily EODHD Bollinger
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: eodhd-production
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -m unittest -v test_engine
+      - uses: actions/cache/restore@v4
+        with:
+          path: private/cache
+          key: eodhd-${{ github.run_id }}
+          restore-keys: eodhd-
+      - name: Fetch, validate and build
+        env:
+          EODHD_API_TOKEN: ${{ secrets.EODHD_API_TOKEN }}
+        run: python bb_eodhd.py
+      - uses: actions/cache/save@v4
+        if: success()
+        with:
+          path: private/cache
+          key: eodhd-${{ github.run_id }}
+      - name: Deploy validated package
+        if: success() && vars.PUBLISH_APPROVED == 'true'
+        env:
+          PUBLISH_APPROVED: ${{ vars.PUBLISH_APPROVED }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: python bb_eodhd.py --deploy
+      - name: Keep diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-and-audit
+          path: |
+            netlify_site.zip
+            private/latest_audit.json
+            private/catalog.json
+          if-no-files-found: ignore
+          retention-days: 7
 
