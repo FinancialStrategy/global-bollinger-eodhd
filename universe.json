@@ -1,0 +1,631 @@
+[
+  {
+    "id": "A01",
+    "name": "S&P 500",
+    "aliases": [
+      "S&P 500",
+      "S&P 500 Index"
+    ],
+    "region": "North America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A02",
+    "name": "NASDAQ 100",
+    "aliases": [
+      "NASDAQ 100",
+      "NASDAQ 100 Index"
+    ],
+    "region": "North America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A03",
+    "name": "Dow Jones Industrial Average",
+    "aliases": [
+      "Dow Jones Industrial Average"
+    ],
+    "region": "North America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A04",
+    "name": "NASDAQ Composite",
+    "aliases": [
+      "NASDAQ Composite"
+    ],
+    "region": "North America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A05",
+    "name": "S&P/TSX Composite",
+    "aliases": [
+      "S&P/TSX Composite"
+    ],
+    "region": "North America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A06",
+    "name": "S&P/BMV IPC",
+    "aliases": [
+      "S&P/BMV IPC",
+      "IPC Mexico"
+    ],
+    "region": "North America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A07",
+    "name": "Bovespa",
+    "aliases": [
+      "Bovespa",
+      "IBOVESPA"
+    ],
+    "region": "Latin America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A08",
+    "name": "S&P MERVAL",
+    "aliases": [
+      "S&P MERVAL",
+      "MERVAL"
+    ],
+    "region": "Latin America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A09",
+    "name": "S&P IPSA",
+    "aliases": [
+      "S&P IPSA",
+      "IPSA"
+    ],
+    "region": "Latin America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A10",
+    "name": "MSCI COLCAP",
+    "aliases": [
+      "MSCI COLCAP",
+      "COLCAP"
+    ],
+    "region": "Latin America",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A11",
+    "name": "EURO STOXX 50",
+    "aliases": [
+      "EURO STOXX 50"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A12",
+    "name": "DAX",
+    "aliases": [
+      "DAX",
+      "DAX Index"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A13",
+    "name": "CAC 40",
+    "aliases": [
+      "CAC 40"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A14",
+    "name": "AEX",
+    "aliases": [
+      "AEX",
+      "AEX Index"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A15",
+    "name": "Swiss Market Index",
+    "aliases": [
+      "Swiss Market Index",
+      "SMI"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A16",
+    "name": "IBEX 35",
+    "aliases": [
+      "IBEX 35"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A17",
+    "name": "FTSE MIB",
+    "aliases": [
+      "FTSE MIB"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A18",
+    "name": "OMX Stockholm 30",
+    "aliases": [
+      "OMX Stockholm 30",
+      "OMXS30"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A19",
+    "name": "BIST 100",
+    "aliases": [
+      "BIST 100",
+      "BIST 100 Index"
+    ],
+    "region": "Europe",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A20",
+    "name": "Nikkei 225",
+    "aliases": [
+      "Nikkei 225"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A21",
+    "name": "TOPIX",
+    "aliases": [
+      "TOPIX"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A22",
+    "name": "Hang Seng",
+    "aliases": [
+      "Hang Seng",
+      "Hang Seng Index"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A23",
+    "name": "CSI 300",
+    "aliases": [
+      "CSI 300"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A24",
+    "name": "Shanghai Composite",
+    "aliases": [
+      "Shanghai Composite"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A25",
+    "name": "Taiwan Weighted",
+    "aliases": [
+      "Taiwan Weighted",
+      "Taiwan Weighted Index"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A26",
+    "name": "KOSPI",
+    "aliases": [
+      "KOSPI",
+      "KOSPI Composite Index"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A27",
+    "name": "S&P/ASX 200",
+    "aliases": [
+      "S&P/ASX 200"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A28",
+    "name": "Nifty 50",
+    "aliases": [
+      "Nifty 50",
+      "NIFTY 50"
+    ],
+    "region": "Asia-Pacific",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A29",
+    "name": "Tadawul All Share",
+    "aliases": [
+      "Tadawul All Share",
+      "TASI"
+    ],
+    "region": "Middle East & Africa",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A30",
+    "name": "FTSE/JSE Top 40",
+    "aliases": [
+      "FTSE/JSE Top 40",
+      "JSE Top 40"
+    ],
+    "region": "Middle East & Africa",
+    "asset_class": "Equity Index",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A31",
+    "name": "Gold",
+    "aliases": [
+      "Gold"
+    ],
+    "region": "Precious Metals",
+    "asset_class": "Precious Metals",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A32",
+    "name": "Silver",
+    "aliases": [
+      "Silver"
+    ],
+    "region": "Precious Metals",
+    "asset_class": "Precious Metals",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A33",
+    "name": "Platinum",
+    "aliases": [
+      "Platinum"
+    ],
+    "region": "Precious Metals",
+    "asset_class": "Precious Metals",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A34",
+    "name": "Palladium",
+    "aliases": [
+      "Palladium"
+    ],
+    "region": "Precious Metals",
+    "asset_class": "Precious Metals",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A35",
+    "name": "Copper",
+    "aliases": [
+      "Copper"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A36",
+    "name": "WTI Crude Oil",
+    "aliases": [
+      "WTI Crude Oil"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A37",
+    "name": "Brent Crude Oil",
+    "aliases": [
+      "Brent Crude Oil"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A38",
+    "name": "Natural Gas",
+    "aliases": [
+      "Natural Gas"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A39",
+    "name": "Heating Oil",
+    "aliases": [
+      "Heating Oil"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A40",
+    "name": "Gasoline",
+    "aliases": [
+      "Gasoline"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A41",
+    "name": "Corn",
+    "aliases": [
+      "Corn"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A42",
+    "name": "Wheat",
+    "aliases": [
+      "Wheat"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A43",
+    "name": "Soybeans",
+    "aliases": [
+      "Soybeans"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A44",
+    "name": "Coffee",
+    "aliases": [
+      "Coffee"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A45",
+    "name": "Cocoa",
+    "aliases": [
+      "Cocoa"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A46",
+    "name": "Sugar",
+    "aliases": [
+      "Sugar"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  },
+  {
+    "id": "A47",
+    "name": "Cotton",
+    "aliases": [
+      "Cotton"
+    ],
+    "region": "Commodities",
+    "asset_class": "Commodities",
+    "provider_symbol": "",
+    "provider_name": "",
+    "instrument_type": "",
+    "volume_verified": false
+  }
+]
