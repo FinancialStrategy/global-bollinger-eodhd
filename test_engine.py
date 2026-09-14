@@ -70,10 +70,12 @@ class EngineTests(unittest.TestCase):
             b.build('UNIT_TEST_SECRET')
             with zipfile.ZipFile(Path(temp)/'netlify_site.zip') as z:
                 self.assertIn('index.html',z.namelist())
-                self.assertIn('A01.html',z.namelist())
+                self.assertIn('portal.js',z.namelist())
+                self.assertIn('plotly.min.js',z.namelist())
+                self.assertIn('portfolio.json',z.namelist())
                 self.assertEqual(len(json.loads(z.read('audit.json'))),47)
                 for name in z.namelist(): self.assertNotIn(b'UNIT_TEST_SECRET',z.read(name))
-                self.assertIn('OOS simulated equity',z.read('A01.html').decode())
+                self.assertIn('OOS simulated equity',z.read('portal-data.js').decode())
 
     def test_catalog_no_comm(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(b,'ROOT',Path(temp)), patch.object(b,'api',return_value=[]) as a:

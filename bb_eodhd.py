@@ -10,8 +10,34 @@ import numpy as np
 import pandas as pd
 from commodities import commodity_view
 
+try:
+    import quantstats as qs
+except ImportError as exc:
+    raise ImportError('quantstats is a required dependency (pip install quantstats). '
+                      'Project policy: no fallback metrics engine exists.') from exc
+try:
+    from pypfopt import risk_models, expected_returns
+    from pypfopt.efficient_frontier import EfficientFrontier
+    from pypfopt.hrp import HRPOpt
+except ImportError as exc:
+    raise ImportError('PyPortfolioOpt is a required dependency (pip install PyPortfolioOpt). '
+                      'Project policy: no fallback portfolio-risk engine exists.') from exc
+import inspect
+
+def _finite(x):
+    try: x = float(x)
+    except (TypeError, ValueError): return None
+    return x if np.isfinite(x) else None
+
+def _qcall(fn, *args, **kwargs):
+    # Pass only kwargs the installed version accepts; guards against minor API drift.
+    params = inspect.signature(fn).parameters
+    if not any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        kwargs = {k: v for k, v in kwargs.items() if k in params}
+    return fn(*args, **kwargs)
+
 ROOT = Path(__file__).resolve().parent
-VERSION = '2.2'
+VERSION = '4.0'
 # Reviewed against user's 2026-09-14 catalog (SHA256 dfb1d249...b1).
 # Explicit user mappings still take precedence. Catalog metadata is rechecked each run.
 REVIEWED_INDICES = {
@@ -258,20 +284,32 @@ def backtest(d,c,start_date=None):
     return out,pd.DataFrame(trades)
 
 def metrics(eq,tr,c):
+    """Performance & risk ratios via QuantStats. No hand-rolled fallback engine."""
     r=eq.equity.pct_change(); r.iloc[0]=eq.equity.iloc[0]/c['capital']-1
-    n=c['annual_bars']; excess=r-((1+c['annual_rf'])**(1/n)-1)
-    vol=r.std(ddof=0)*np.sqrt(n); downside=np.sqrt(np.mean(np.minimum(excess,0)**2))*np.sqrt(n)
-    peak=eq.equity.cummax().clip(lower=c['capital']); dd=eq.equity/peak-1
-    years=max((eq.index[-1]-eq.index[0]).days/365.25,1/365.25)
-    total=eq.equity.iloc[-1]/c['capital']-1
+    n=c['annual_bars']; rf=c['annual_rf']
+    def q(name,*args,**kwargs):
+        try: return _finite(_qcall(getattr(qs.stats,name),*args,**kwargs))
+        except Exception: return None
     pnl=tr.net_pnl if len(tr) else pd.Series(dtype=float)
-    values=dict(total_return=total,cagr=(1+total)**(1/years)-1,max_drawdown=dd.min(),
-        volatility=vol,sharpe=excess.mean()*n/vol if vol>0 else None,
-        sortino=excess.mean()*n/downside if downside>0 else None,
-        trades=len(tr),win_rate=float((pnl>0).mean()) if len(pnl) else None,
+    return dict(
+        total_return=_finite(qs.stats.comp(r)-1),
+        cagr=q('cagr',r,periods=n),
+        max_drawdown=q('max_drawdown',r),
+        volatility=q('volatility',r,periods=n),
+        sharpe=q('sharpe',r,rf=rf,periods=n),
+        sortino=q('sortino',r,rf=rf,periods=n),
+        calmar=q('calmar',r,periods=n),
+        omega=q('omega',r,rf=rf,periods=n),
+        var_95=q('var',r,confidence=0.95),
+        cvar_95=q('cvar',r,confidence=0.95),
+        skew=q('skew',r),
+        kurtosis=q('kurtosis',r),
+        tail_ratio=q('tail_ratio',r),
+        ulcer_index=q('ulcer_index',r),
+        trades=len(tr),
+        win_rate=float((pnl>0).mean()) if len(pnl) else None,
         profit_factor=float(pnl[pnl>0].sum()/-pnl[pnl<0].sum()) if (pnl<0).any() else None,
         exposure=float(eq.exposed.mean()))
-    return {k:(float(v) if isinstance(v,np.number) else v) for k,v in values.items()}
 
 def analyze(df,c):
     split=int(len(df)*c['train_ratio']); date=df.index[split]
@@ -309,6 +347,47 @@ def page(title,body):
 body{font:16px Arial,sans-serif;margin:0;background:#101b2b;color:#eef2f6}main{max-width:1250px;margin:auto;padding:24px}h1{font-weight:400;color:#ee9b4c}a{color:#82c9ff}table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #526070}section{overflow-x:auto}select{padding:10px}p{line-height:1.6}
 </style><main><h1>'''+html.escape(title)+'</h1>'+body+'</main></html>'
 
+def portfolio_analytics(closes,cfg,names):
+    """PyPortfolioOpt research block on exact common observation dates. No fill, no proxy."""
+    out=dict(status='unavailable',risk_free=cfg['annual_rf'],names=names)
+    if len(closes)<5:
+        out['reason']='fewer than 5 validated OHLC series; a cross-market panel is required'
+        return out
+    prices=pd.DataFrame(closes).sort_index()
+    clean=prices.pct_change(fill_method=None).dropna(how='any')
+    if len(clean)<cfg['min_rows']:
+        out['reason']=(f'exact common observations ({len(clean)}) below min_rows={cfg["min_rows"]}; '
+                       'dates are never filled or proxied')
+        return out
+    mu=expected_returns.mean_historical_return(prices,frequency=cfg['annual_bars'])
+    S=risk_models.sample_cov(prices,frequency=cfg['annual_bars'])
+    ids=list(prices.columns)
+    def perf(weights):
+        w=np.array([weights.get(i,0.0) for i in ids])
+        mu_v=mu.reindex(ids).to_numpy(); S_m=S.loc[ids,ids].to_numpy()
+        ret=float(w@mu_v); vol=float(np.sqrt(w@S_m@w))
+        return dict(expected_return=ret,volatility=vol,
+                    sharpe=(ret-cfg['annual_rf'])/vol if vol>0 else None)
+    def tidy(w):
+        return {i:float(round(v,4)) for i,v in w.items() if v>1e-4}
+    block=dict(n_assets=len(ids),n_observations=int(len(clean)),
+               window_start=str(clean.index[0].date()),window_end=str(clean.index[-1].date()))
+    try:
+        ef=EfficientFrontier(mu,S); ef.max_sharpe(risk_free_rate=cfg['annual_rf'])
+        w=ef.clean_weights(); block['max_sharpe']=dict(weights=tidy(w),**perf(w))
+    except Exception as exc: block['max_sharpe_error']=f'{type(exc).__name__}: {exc}'
+    try:
+        ef=EfficientFrontier(mu,S); ef.min_volatility()
+        w=ef.clean_weights(); block['min_volatility']=dict(weights=tidy(w),**perf(w))
+    except Exception as exc: block['min_volatility_error']=f'{type(exc).__name__}: {exc}'
+    try:
+        hrp=HRPOpt(clean); hrp.optimize()
+        w={k:float(v) for k,v in hrp.clean_weights().items()}
+        block['hrp']=dict(weights=tidy(w),**perf(w))
+    except Exception as exc: block['hrp_error']=f'{type(exc).__name__}: {exc}'
+    out.update(status='OK',**block)
+    return out
+
 def build(token):
     initialize(); cfg=json.loads((ROOT/'config.json').read_text()); assets=json.loads((ROOT/'universe.json').read_text())
     if not (0<cfg['risk']<=.1 and 0<cfg['exposure']<=1 and .5<=cfg['train_ratio']<=.9):
@@ -316,7 +395,7 @@ def build(token):
     if cfg['stop_atr']<=0 or cfg['target_r']<=0 or cfg['bb_length']<2:
         raise DataError('Invalid stop/target/Bollinger parameters')
     if len([a for a in assets if a['asset_class']=='Equity Index'])!=30: raise DataError('Registry must contain exactly 30 equity indices')
-    records=catalog(token); audit=[]; summaries=[]; returns={}
+    records=catalog(token); audit=[]; summaries=[]; returns={}; closes={}; names={}
     from tempfile import mkdtemp
     stage=Path(mkdtemp(prefix='bb-build-',dir=ROOT))
     import plotly.graph_objects as go
@@ -346,9 +425,11 @@ def build(token):
             d,eq,tr,m,trials=analyze(df,cfg)
             volume_ok=asset['volume_verified'] and d.volume.tail(55).gt(0).all()
             row.update(status='PASS',vwap_eligible=bool(volume_ok))
-            m.update(row); summaries.append(m); returns[asset['id']]=df.close.pct_change()
+            m.update(row); summaries.append(m); returns[asset['id']]=df.close.pct_change(fill_method=None)
+            closes[asset['id']]=df.close; names[asset['id']]=asset['name']
             f=make_subplots(rows=3,cols=1,shared_xaxes=True,vertical_spacing=.05)
-            for col in ['close','basis','upper','lower']:
+            f.add_trace(go.Candlestick(x=d.index,open=d.open,high=d.high,low=d.low,close=d.close,name='OHLC'),row=1,col=1)
+            for col in ['basis','upper','lower']:
                 f.add_trace(go.Scatter(x=d.index,y=d[col],name=col),row=1,col=1)
             if volume_ok:
                 vwap=(((d.high+d.low+d.close)/3*d.volume).rolling(55).sum()/d.volume.rolling(55).sum())
@@ -365,6 +446,7 @@ def build(token):
             write_json(stage/(asset['id']+'.json'),dict(metrics=m,trades=tr.to_dict('records'),optimization=trials))
         except DataError as exc: row.update(status='REJECTED',reason=str(exc))
         audit.append(row); print(asset['id'],asset['name'],row['status'])
+    write_json(stage/'portfolio.json',portfolio_analytics(closes,cfg,names))
     write_json(ROOT/'private/latest_audit.json',audit)
     if not summaries: raise DataError('No valid fresh series: previous deployment retained; inspect private/latest_audit.json')
     stamp=datetime.now(timezone.utc).isoformat()
@@ -376,6 +458,8 @@ def build(token):
     write_json(stage/'audit.json',audit); write_json(stage/'summary.json',summaries)
     # Pairwise exact common observations, no fill across market holidays.
     pd.DataFrame(returns).corr(min_periods=100).to_csv(stage/'correlations.csv')
+    from report_ui import write_portal
+    write_portal(stage)
     for file in stage.iterdir():
         if token and token.encode() in file.read_bytes(): raise DataError('Secret detected: publication blocked')
     target=ROOT/'netlify_site.zip'
