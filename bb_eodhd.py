@@ -24,6 +24,8 @@ except ImportError as exc:
                       'Project policy: no fallback portfolio-risk engine exists.') from exc
 import inspect, warnings
 
+EWMA_LAMBDA=0.94  # RiskMetrics decay factor for EWMA variance
+
 def _finite(x):
     try: x = float(x)
     except (TypeError, ValueError): return None
@@ -432,7 +434,7 @@ def build(token):
             row.update(status='PASS',vwap_eligible=bool(volume_ok))
             m.update(row); summaries.append(m); returns[asset['id']]=df.close.pct_change(fill_method=None)
             closes[asset['id']]=df.close; names[asset['id']]=asset['name']
-            f=make_subplots(rows=3,cols=1,shared_xaxes=True,vertical_spacing=.05)
+            f=make_subplots(rows=5,cols=1,shared_xaxes=True,vertical_spacing=.04,row_heights=[.36,.18,.14,.16,.16])
             f.add_trace(go.Candlestick(x=d.index,open=d.open,high=d.high,low=d.low,close=d.close,name='OHLC'),row=1,col=1)
             for col in ['basis','upper','lower']:
                 f.add_trace(go.Scatter(x=d.index,y=d[col],name=col),row=1,col=1)
@@ -442,8 +444,20 @@ def build(token):
             f.add_trace(go.Scatter(x=eq.index,y=eq.equity,name='OOS simulated equity'),row=2,col=1)
             bh=cfg['capital']*d.loc[eq.index,'close']/d.loc[eq.index[0],'close']
             f.add_trace(go.Scatter(x=eq.index,y=bh,name='B&H gross, no costs'),row=2,col=1)
-            f.add_trace(go.Scatter(x=eq.index,y=100*(eq.equity/eq.equity.cummax().clip(lower=cfg['capital'])-1),name='Drawdown %'),row=3,col=1)
-            f.update_layout(height=950,template='plotly_dark',title=asset['name'])
+            f.add_trace(go.Scatter(x=eq.index,y=100*(eq.equity/eq.equity.cummax().clip(lower=cfg['capital'])-1),name='Drawdown %',fill='tozeroy'),row=3,col=1)
+            r_roll=eq.equity.pct_change(); r_roll.iloc[0]=eq.equity.iloc[0]/cfg['capital']-1
+            try:
+                roll_sharpe=_qcall(qs.stats.rolling_sharpe,r_roll,rf=cfg['annual_rf'],
+                                   periods=cfg['annual_bars'],window=min(126,len(r_roll)))
+            except Exception: roll_sharpe=None
+            if roll_sharpe is not None and int(roll_sharpe.notna().sum())>1:
+                f.add_trace(go.Scatter(x=roll_sharpe.index,y=roll_sharpe,name='Rolling Sharpe 126d',fill='tozeroy'),row=4,col=1)
+            r_full=df.close.pct_change(fill_method=None)
+            ewma_var=(r_full**2).ewm(alpha=1-EWMA_LAMBDA,adjust=False).mean()
+            ewma_pct=np.sqrt(ewma_var)*np.sqrt(cfg['annual_bars'])*100
+            m['ewma_annual_pct']=_finite(float(ewma_pct.iloc[-1]))
+            f.add_trace(go.Scatter(x=ewma_pct.index,y=ewma_pct,name='EWMA volatility (ann. %)',fill='tozeroy'),row=5,col=1)
+            f.update_layout(height=1300,template='plotly_dark',title=asset['name'])
             body='<a href="index.html">Back</a><p>Research on reference prices; not executable index/futures P&L. Each series uses independent capital. Short borrow, futures rolls and FX conversion are not modeled.</p>'
             body+=f.to_html(full_html=False,include_plotlyjs=True)
             body+=pd.DataFrame([m]).to_html(index=False,escape=True)+tr.to_html(index=False,escape=True)

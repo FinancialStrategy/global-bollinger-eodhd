@@ -14,8 +14,8 @@ function rangeY(traces,range){let lo=Infinity,hi=-Infinity;const left=range?Date
  if(!Number.isFinite(lo))return null;const pad=(hi-lo||Math.abs(hi)*.02||1)*.07;return [lo-pad,hi+pad];}
 window.portalRangeY=rangeY;
 function autoscale(id){const el=$(id);if(!el.data)return;const r=el.layout.xaxis?.autorange?null:el.layout.xaxis?.range;const y=rangeY(el.data,r);if(y)Plotly.relayout(el,{'yaxis.range':y,'yaxis.autorange':false});}
-async function timeChart(id,traces,unit){const clean=traces.map((t,i)=>{const v=structuredClone(t);delete v.xaxis;delete v.yaxis;v.line={...v.line,color:colors[i%colors.length],width:i?1.4:2};return v;});
- const layout=base();layout.yaxis.title={text:unit};layout.xaxis.type='date';
+async function timeChart(id,traces,unit,opts){const clean=traces.map((t,i)=>{const v=structuredClone(t);delete v.xaxis;delete v.yaxis;v.line={...v.line,color:colors[i%colors.length],width:i?1.4:2};return v;});
+ const layout=base();layout.yaxis.title={text:unit};layout.xaxis.type='date';if(opts&&opts.slider)layout.xaxis.rangeslider={visible:true,thickness:.06};
  const yr=rangeY(clean,null);if(yr)layout.yaxis.range=yr;
  await Plotly.newPlot(id,clean,layout,config);const el=$(id);
  el.on('plotly_relayout',ev=>{if(Object.keys(ev).some(k=>k.startsWith('xaxis.range')||k==='xaxis.autorange'))autoscale(id);});
@@ -31,7 +31,7 @@ async function market(){const a=valid.find(a=>a.meta.id===$('marketAsset').value
  const m=a.meta;$('marketInfo').innerHTML='<strong>'+escapeHTML(m.name)+'</strong> · '+escapeHTML(m.symbol)+'<br>Latest data: '+escapeHTML(m.last_date)+' · OOS: '+escapeHTML(m.test_start)+' → '+escapeHTML(m.last_date)+' · Net return '+pct(m.total_return)+' · Sharpe '+num(m.sharpe);
  const price=a.traces.filter(t=>!t.yaxis||t.yaxis==='y');
  if($('tradeMarkers').checked)for(const side of [1,-1]){const rows=a.trades.filter(t=>t.direction===side);if(rows.length)price.push({type:'scatter',mode:'markers',x:rows.map(t=>t.entry_date),y:rows.map(t=>t.entry),name:side===1?'Long entry':'Short entry',marker:{symbol:side===1?'triangle-up':'triangle-down',size:9,color:side===1?colors[3]:colors[4]}});}
- await timeChart('price',price,m.currency||'Price');await timeChart('equity',a.traces.filter(t=>t.yaxis==='y2'),'Capital');await timeChart('drawdown',a.traces.filter(t=>t.yaxis==='y3'),'%');
+ await timeChart('price',price,m.currency||'Price',{slider:true});await timeChart('equity',a.traces.filter(t=>t.yaxis==='y2'),'Capital');await timeChart('drawdown',a.traces.filter(t=>t.yaxis==='y3'),'%');await timeChart('rollsharpe',a.traces.filter(t=>t.yaxis==='y4'),'Sharpe (ann.)');await timeChart('ewma',a.traces.filter(t=>t.yaxis==='y5'),'Ann. %');
  $('marketPeriods').querySelector('[data-period="1Y"]').click();}
 async function commodity(){const a=commodities.find(a=>a.meta.id===$('commodityAsset').value);if(!a){$('commodityInfo').textContent='No commodity data available.';return;}const m=a.meta;$('commodityInfo').innerHTML='<strong>'+escapeHTML(m.name)+'</strong><br>'+escapeHTML(m.provider_name)+' · '+escapeHTML(m.interval)+' · '+escapeHTML(m.unit)+' · Latest observation '+escapeHTML(m.last_date);await timeChart('commodityChart',a.traces,m.unit);$('commodityPeriods').querySelector('[data-period="3Y"]').click();}
 function overview(){const eqIdx=valid.filter(a=>a.meta.asset_class==='Equity Index');
@@ -61,7 +61,7 @@ function risk(){portfolioCard();
  const rows=valid.map(a=>a.meta);
  bars('riskChart',rows.filter(r=>Number.isFinite(r.egarch_annual_pct)).sort((a,b)=>a.egarch_annual_pct-b.egarch_annual_pct),r=>r.egarch_annual_pct,'Annualized conditional volatility (%)');
  table('perfTable',rows,[['Instrument','name'],['Total return',r=>pct(r.total_return)],['CAGR',r=>pct(r.cagr)],['Ann. volatility',r=>pct(r.volatility)],['Sharpe',r=>num(r.sharpe)],['Sortino',r=>num(r.sortino)],['Calmar',r=>num(r.calmar)],['Omega',r=>num(r.omega)],['Max drawdown',r=>pct(r.max_drawdown)],['Win rate',r=>pct(r.win_rate)],['Profit factor',r=>num(r.profit_factor)],['Trades','trades'],['Exposure',r=>pct(r.exposure)]]);
- table('riskTable',rows,[['Instrument','name'],['Daily VaR 95%',r=>pct(r.var_95)],['Daily CVaR 95%',r=>pct(r.cvar_95)],['Skew',r=>num(r.skew)],['Kurtosis',r=>num(r.kurtosis)],['Tail ratio',r=>num(r.tail_ratio)],['Ulcer index',r=>num(r.ulcer_index)],['EGARCH (ann.)',r=>num(r.egarch_annual_pct)+'%'],['Model status','egarch_status'],['Max drawdown',r=>pct(r.max_drawdown)]]);}
+ table('riskTable',rows,[['Instrument','name'],['Daily VaR 95%',r=>pct(r.var_95)],['Daily CVaR 95%',r=>pct(r.cvar_95)],['Skew',r=>num(r.skew)],['Kurtosis',r=>num(r.kurtosis)],['Tail ratio',r=>num(r.tail_ratio)],['Ulcer index',r=>num(r.ulcer_index)],['EGARCH (ann.)',r=>num(r.egarch_annual_pct)+'%'],['EWMA (ann.)',r=>num(r.ewma_annual_pct)+'%'],['Model status','egarch_status'],['Max drawdown',r=>pct(r.max_drawdown)]]);}
 function trades(){const a=valid.find(a=>a.meta.id===$('tradeAsset').value);table('tradeTable',a?.trades||[],[['Entry','entry_date'],['Exit','exit_date'],['Side',r=>r.direction===1?'Long':'Short'],['Entry price',r=>num(r.entry)],['Exit price',r=>num(r.exit)],['Quantity',r=>num(r.quantity)],['Net P&L',r=>num(r.net_pnl)],['Exit reason','reason']]);}
 function audit(){const q=$('auditSearch').value.toLowerCase(),s=$('auditStatus').value;table('auditTable',D.audit.filter(r=>(!s||r.status===s)&&(r.name+' '+(r.symbol||'')).toLowerCase().includes(q)),[['Asset','name'],['Region','region'],['Symbol','symbol'],['Status','status'],['Data date','last_date'],['Observations','observations'],['Reason','reason']]);}
 const tabs=[['overview','Executive'],['universe','Investment Universe'],['market','Index Lab'],['commodities','Commodities'],['risk','Risk & Performance'],['trades','Trade Log'],['audit','Data Audit']];
@@ -73,7 +73,7 @@ $('tabs').onkeydown=e=>{const list=[...$('tabs').querySelectorAll('button')];let
 options('marketAsset',valid);options('tradeAsset',valid);options('commodityAsset',commodities);
 $('uRegion').innerHTML=['All',...new Set(D.audit.map(a=>a.region))].map(r=>'<option>'+escapeHTML(r)+'</option>').join('');
 $('uGroup').innerHTML=['All',...new Set(D.audit.map(a=>a.asset_class))].map(r=>'<option>'+escapeHTML(r)+'</option>').join('');
-periods('marketPeriods',['price','equity','drawdown']);periods('commodityPeriods',['commodityChart']);
+periods('marketPeriods',['price','equity','drawdown','rollsharpe','ewma']);periods('commodityPeriods',['commodityChart']);
 $('marketAsset').onchange=market;$('tradeMarkers').onchange=market;$('commodityAsset').onchange=commodity;$('tradeAsset').onchange=trades;$('auditSearch').oninput=audit;$('auditStatus').onchange=audit;$('uRegion').onchange=universe;$('uGroup').onchange=universe;
 $('exportTrades').onclick=()=>{const a=valid.find(a=>a.meta.id===$('tradeAsset').value);if(!a?.trades.length)return;const keys=Object.keys(a.trades[0]);const safe=v=>'"'+String(v??'').replace(/"/g,'""').replace(/^[=+@]/,"'")+'"';const csv=[keys,...a.trades.map(r=>keys.map(k=>r[k]))].map(row=>row.map(safe).join(',')).join('\n');const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}));const link=document.createElement('a');link.href=url;link.download=a.meta.id+'-trades.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 $('buildDate').textContent='UI: '+D.rendered.slice(0,10);

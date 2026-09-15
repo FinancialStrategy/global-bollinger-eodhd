@@ -29,6 +29,12 @@
 <div id="equity" class="chart"></div>
 <h2>Drawdown</h2>
 <div id="drawdown" class="chart small"></div>
+<h2>Rolling Sharpe · 126 days</h2>
+<p class="note">QuantStats rolling window over the OOS equity curve; annualized. Sparse when the OOS window is short.</p>
+<div id="rollsharpe" class="chart small"></div>
+<h2>EWMA volatility · RiskMetrics &lambda;=0.94</h2>
+<p class="note">Exponentially weighted moving average of variance: &sigma;&sup2;t = &lambda;&middot;&sigma;&sup2;t&#8722;1 + (1&minus;&lambda;)&middot;r&sup2;t with &lambda; = 0.94, annualized (&times;&radic;252). Computed per instrument at build time; recent observations carry the most weight &mdash; the standard industry risk model.</p>
+<div id="ewma" class="chart small"></div>
 </section>
 <section id="commodities" role="tabpanel" hidden>
 <div class="toolbar"><label>Commodity<select id="commodityAsset"></select></label><div id="commodityPeriods" class="periods"></div></div>
