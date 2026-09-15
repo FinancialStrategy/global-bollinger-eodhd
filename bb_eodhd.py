@@ -10,36 +10,8 @@ import numpy as np
 import pandas as pd
 from commodities import commodity_view
 
-try:
-    import quantstats as qs
-except ImportError as exc:
-    raise ImportError('quantstats is a required dependency (pip install quantstats). '
-                      'Project policy: no fallback metrics engine exists.') from exc
-try:
-    from pypfopt import risk_models, expected_returns
-    from pypfopt.efficient_frontier import EfficientFrontier
-    from pypfopt.hierarchical_portfolio import HRPOpt
-except ImportError as exc:
-    raise ImportError('PyPortfolioOpt is a required dependency (pip install PyPortfolioOpt). '
-                      'Project policy: no fallback portfolio-risk engine exists.') from exc
-import inspect, warnings
-
-EWMA_LAMBDA=0.94  # RiskMetrics decay factor for EWMA variance
-
-def _finite(x):
-    try: x = float(x)
-    except (TypeError, ValueError): return None
-    return x if np.isfinite(x) else None
-
-def _qcall(fn, *args, **kwargs):
-    # Pass only kwargs the installed version accepts; guards against minor API drift.
-    params = inspect.signature(fn).parameters
-    if not any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
-        kwargs = {k: v for k, v in kwargs.items() if k in params}
-    return fn(*args, **kwargs)
-
 ROOT = Path(__file__).resolve().parent
-VERSION = '4.1'
+VERSION = '4.0'
 # Reviewed against user's 2026-09-14 catalog (SHA256 dfb1d249...b1).
 # Explicit user mappings still take precedence. Catalog metadata is rechecked each run.
 REVIEWED_INDICES = {
@@ -52,7 +24,7 @@ REVIEWED_INDICES = {
  'Hang Seng': ('HSI.INDX','Hang Seng (Hong Kong)','HKD',None),
  'CSI 300': ('CSI300.INDX','Shanghai Shenzhen CSI 300','CNY',None),
 }
-DEFAULT = dict(start='2018-01-01', capital=100000., risk=.01, exposure=1.,
+DEFAULT = dict(start='2010-01-01', capital=100000., risk=.01, exposure=1.,
                commission=.0005, slippage=.0005, annual_rf=.03, annual_bars=252,
                bb_length=55, bb_std=1., atr_length=14, stop_atr=2., target_r=2.,
                trail_atr=2.5, trend_length=200, trend_filter=True, rsi_filter=False,
@@ -158,6 +130,11 @@ def validate(df, cfg):
     if not set(required).issubset(df.columns): raise DataError('Missing OHLC')
     df=df.sort_index().copy()
     if df.index.has_duplicates: raise DataError('Duplicate dates')
+    if any(ts.normalize()!=ts for ts in df.index):
+        raise DataError('Non-daily timestamps: completed daily bars required')
+    gaps=df.index.to_series().diff().dt.days.dropna()
+    if not gaps.empty and gaps.median()>3:
+        raise DataError('Non-daily source spacing: completed daily EOD bars required')
     for col in required: df[col]=pd.to_numeric(df[col],errors='coerce')
     x=df[required]
     if not np.isfinite(x.to_numpy()).all() or (x<=0).any().any():
@@ -167,9 +144,6 @@ def validate(df, cfg):
     if len(df)<cfg['min_rows']: raise DataError('Insufficient history')
     if df.index.min()>pd.Timestamp(cfg['start'])+pd.Timedelta(days=10):
         raise DataError(f'Truncated requested history: requested={cfg["start"]}, first={df.index.min().date()}, last={df.index.max().date()}, rows={len(df)}')
-    gaps=df.index.to_series().diff().dt.days.dropna()
-    if len(gaps) and (float(gaps.median())>4 or int(gaps.max())>14):
-        raise DataError(f'Not daily frequency: median gap {gaps.median():.0f}d, max {gaps.max():.0f}d. Daily frequency is mandatory; the series is rejected, never resampled or substituted')
     moves=df.close.pct_change(fill_method=None)
     if moves.abs().gt(.35).any():
         when=moves.abs().idxmax(); i=df.index.get_loc(when)
@@ -191,12 +165,12 @@ def fetch(asset, symbol, token, cfg):
     # Exclude current UTC day; completed EOD bars only.
     end=(pd.Timestamp.now(tz='UTC')-pd.Timedelta(days=1)).strftime('%Y-%m-%d')
     fresh=pd.DataFrame(api('eod/'+quote(symbol,safe='.'),token,{'from':start,'to':end,'period':'d','order':'a'}))
+    if fresh.empty: raise DataError('Empty EODHD response: cached observations cannot replace the requested update')
     if len(fresh):
         fresh.index=pd.to_datetime(fresh.pop('date'))
         if fresh.index.has_duplicates: raise DataError('Provider duplicate dates')
         if (fresh.index>pd.Timestamp(end)).any(): raise DataError('Unexpected current/future bar')
     df=pd.concat([old,fresh]); df=df[~df.index.duplicated(keep='last')]
-    df=df[df.index>=pd.Timestamp(cfg['start'])]  # history window starts at cfg['start']; cached pre-window bars are dropped
     # Preserve raw diagnostic observations for rejected series, outside published files.
     if not df.empty:
         diagnostic=df.sort_index()
@@ -290,37 +264,14 @@ def backtest(d,c,start_date=None):
     return out,pd.DataFrame(trades)
 
 def metrics(eq,tr,c):
-    """Performance & risk ratios via QuantStats. No hand-rolled fallback engine."""
-    r=eq.equity.pct_change(); r.iloc[0]=eq.equity.iloc[0]/c['capital']-1
-    n=c['annual_bars']; rf=c['annual_rf']
-    def q(name,*args,**kwargs):
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')  # degenerate-series warnings map to None below
-                return _finite(_qcall(getattr(qs.stats,name),*args,**kwargs))
-        except Exception: return None
+    from analytics import equity_returns, calculate
+    values=calculate(equity_returns(eq.equity,c['capital']),c['annual_rf'],c['annual_bars'])
     pnl=tr.net_pnl if len(tr) else pd.Series(dtype=float)
-    # Anchor at the initial capital so drawdowns are measured from capital (v3 definition):
-    r_dd=pd.Series(np.concatenate([[0.0],np.asarray(r,dtype=float)]))
-    return dict(
-        total_return=_finite(qs.stats.comp(r)),
-        cagr=q('cagr',r,periods=n),
-        max_drawdown=q('max_drawdown',r_dd),
-        volatility=q('volatility',r,periods=n),
-        sharpe=q('sharpe',r,rf=rf,periods=n),
-        sortino=q('sortino',r,rf=rf,periods=n),
-        calmar=q('calmar',r,periods=n),
-        omega=q('omega',r,rf=rf,periods=n),
-        var_95=q('var',r,confidence=0.95),
-        cvar_95=q('cvar',r,confidence=0.95),
-        skew=q('skew',r),
-        kurtosis=q('kurtosis',r),
-        tail_ratio=q('tail_ratio',r),
-        ulcer_index=q('ulcer_index',r_dd),
-        trades=len(tr),
-        win_rate=float((pnl>0).mean()) if len(pnl) else None,
+    # Trade-ledger statistics are deliberately separate from return-series ratios.
+    values.update(trades=len(tr),win_rate=float((pnl>0).mean()) if len(pnl) else None,
         profit_factor=float(pnl[pnl>0].sum()/-pnl[pnl<0].sum()) if (pnl<0).any() else None,
-        exposure=float(eq.exposed.mean()))
+        exposure=float(eq.exposed.mean()),trade_metric_engine='Backtest execution ledger')
+    return values
 
 def analyze(df,c):
     split=int(len(df)*c['train_ratio']); date=df.index[split]
@@ -358,47 +309,6 @@ def page(title,body):
 body{font:16px Arial,sans-serif;margin:0;background:#101b2b;color:#eef2f6}main{max-width:1250px;margin:auto;padding:24px}h1{font-weight:400;color:#ee9b4c}a{color:#82c9ff}table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #526070}section{overflow-x:auto}select{padding:10px}p{line-height:1.6}
 </style><main><h1>'''+html.escape(title)+'</h1>'+body+'</main></html>'
 
-def portfolio_analytics(closes,cfg,names):
-    """PyPortfolioOpt research block on exact common observation dates. No fill, no proxy."""
-    out=dict(status='unavailable',risk_free=cfg['annual_rf'],names=names)
-    if len(closes)<5:
-        out['reason']='fewer than 5 validated OHLC series; a cross-market panel is required'
-        return out
-    prices=pd.DataFrame(closes).sort_index()
-    clean=prices.pct_change(fill_method=None).dropna(how='any')
-    if len(clean)<cfg['min_rows']:
-        out['reason']=(f'exact common observations ({len(clean)}) below min_rows={cfg["min_rows"]}; '
-                       'dates are never filled or proxied')
-        return out
-    mu=expected_returns.mean_historical_return(prices,frequency=cfg['annual_bars'])
-    S=risk_models.sample_cov(prices,frequency=cfg['annual_bars'])
-    ids=list(prices.columns)
-    def perf(weights):
-        w=np.array([weights.get(i,0.0) for i in ids])
-        mu_v=mu.reindex(ids).to_numpy(); S_m=S.loc[ids,ids].to_numpy()
-        ret=float(w@mu_v); vol=float(np.sqrt(w@S_m@w))
-        return dict(expected_return=ret,volatility=vol,
-                    sharpe=(ret-cfg['annual_rf'])/vol if vol>0 else None)
-    def tidy(w):
-        return {i:float(round(v,4)) for i,v in w.items() if v>1e-4}
-    block=dict(n_assets=len(ids),n_observations=int(len(clean)),
-               window_start=str(clean.index[0].date()),window_end=str(clean.index[-1].date()))
-    try:
-        ef=EfficientFrontier(mu,S); ef.max_sharpe(risk_free_rate=cfg['annual_rf'])
-        w=ef.clean_weights(); block['max_sharpe']=dict(weights=tidy(w),**perf(w))
-    except Exception as exc: block['max_sharpe_error']=f'{type(exc).__name__}: {exc}'
-    try:
-        ef=EfficientFrontier(mu,S); ef.min_volatility()
-        w=ef.clean_weights(); block['min_volatility']=dict(weights=tidy(w),**perf(w))
-    except Exception as exc: block['min_volatility_error']=f'{type(exc).__name__}: {exc}'
-    try:
-        hrp=HRPOpt(clean); hrp.optimize()
-        w={k:float(v) for k,v in hrp.clean_weights().items()}
-        block['hrp']=dict(weights=tidy(w),**perf(w))
-    except Exception as exc: block['hrp_error']=f'{type(exc).__name__}: {exc}'
-    out.update(status='OK',**block)
-    return out
-
 def build(token):
     initialize(); cfg=json.loads((ROOT/'config.json').read_text()); assets=json.loads((ROOT/'universe.json').read_text())
     if not (0<cfg['risk']<=.1 and 0<cfg['exposure']<=1 and .5<=cfg['train_ratio']<=.9):
@@ -406,7 +316,7 @@ def build(token):
     if cfg['stop_atr']<=0 or cfg['target_r']<=0 or cfg['bb_length']<2:
         raise DataError('Invalid stop/target/Bollinger parameters')
     if len([a for a in assets if a['asset_class']=='Equity Index'])!=30: raise DataError('Registry must contain exactly 30 equity indices')
-    records=catalog(token); audit=[]; summaries=[]; returns={}; closes={}; names={}
+    records=catalog(token); audit=[]; summaries=[]; returns={}
     from tempfile import mkdtemp
     stage=Path(mkdtemp(prefix='bb-build-',dir=ROOT))
     import plotly.graph_objects as go
@@ -436,8 +346,7 @@ def build(token):
             d,eq,tr,m,trials=analyze(df,cfg)
             volume_ok=asset['volume_verified'] and d.volume.tail(55).gt(0).all()
             row.update(status='PASS',vwap_eligible=bool(volume_ok))
-            m.update(row); summaries.append(m); returns[asset['id']]=df.close.pct_change(fill_method=None)
-            closes[asset['id']]=df.close; names[asset['id']]=asset['name']
+            m.update(row); summaries.append(m); returns[asset['id']]=df.close.pct_change()
             f=make_subplots(rows=5,cols=1,shared_xaxes=True,vertical_spacing=.04,row_heights=[.36,.18,.14,.16,.16])
             f.add_trace(go.Candlestick(x=d.index,open=d.open,high=d.high,low=d.low,close=d.close,name='OHLC'),row=1,col=1)
             for col in ['basis','upper','lower']:
@@ -448,18 +357,17 @@ def build(token):
             f.add_trace(go.Scatter(x=eq.index,y=eq.equity,name='OOS simulated equity'),row=2,col=1)
             bh=cfg['capital']*d.loc[eq.index,'close']/d.loc[eq.index[0],'close']
             f.add_trace(go.Scatter(x=eq.index,y=bh,name='B&H gross, no costs'),row=2,col=1)
-            f.add_trace(go.Scatter(x=eq.index,y=100*(eq.equity/eq.equity.cummax().clip(lower=cfg['capital'])-1),name='Drawdown %',fill='tozeroy'),row=3,col=1)
+            f.add_trace(go.Scatter(x=eq.index,y=100*(eq.equity/eq.equity.cummax().clip(lower=cfg['capital'])-1),name='Drawdown %'),row=3,col=1)
+            f.add_trace(go.Scatter(x=eq.index,y=100*(bh/bh.cummax()-1),name='B&H drawdown %',fill='tozeroy',opacity=.55),row=3,col=1)
             r_roll=eq.equity.pct_change(); r_roll.iloc[0]=eq.equity.iloc[0]/cfg['capital']-1
             try:
-                roll_sharpe=_qcall(qs.stats.rolling_sharpe,r_roll,rf=cfg['annual_rf'],
-                                   periods=cfg['annual_bars'],window=min(126,len(r_roll)))
-            except Exception: roll_sharpe=None
-            if roll_sharpe is not None and int(roll_sharpe.notna().sum())>1:
-                f.add_trace(go.Scatter(x=roll_sharpe.index,y=roll_sharpe,name='Rolling Sharpe 126d',fill='tozeroy'),row=4,col=1)
-            r_full=df.close.pct_change(fill_method=None)
-            ewma_var=(r_full**2).ewm(alpha=1-EWMA_LAMBDA,adjust=False).mean()
-            ewma_pct=np.sqrt(ewma_var)*np.sqrt(cfg['annual_bars'])*100
-            m['ewma_annual_pct']=_finite(float(ewma_pct.iloc[-1]))
+                import quantstats as qs
+                roll_sharpe=qs.stats.rolling_sharpe(r_roll,rf=cfg['annual_rf'],periods=cfg['annual_bars'],window=min(126,len(r_roll)))
+                if roll_sharpe is not None and int(roll_sharpe.notna().sum())>1:
+                    f.add_trace(go.Scatter(x=roll_sharpe.index,y=roll_sharpe,name='Rolling Sharpe 126d',fill='tozeroy'),row=4,col=1)
+            except Exception: pass
+            ewma_pct=np.sqrt((df.close.pct_change(fill_method=None)**2).ewm(alpha=1-0.94,adjust=False).mean())*np.sqrt(cfg['annual_bars'])*100
+            m['ewma_annual_pct']=float(ewma_pct.iloc[-1]) if np.isfinite(ewma_pct.iloc[-1]) else None
             f.add_trace(go.Scatter(x=ewma_pct.index,y=ewma_pct,name='EWMA volatility (ann. %)',fill='tozeroy'),row=5,col=1)
             f.update_layout(height=1300,template='plotly_dark',title=asset['name'])
             body='<a href="index.html">Back</a><p>Research on reference prices; not executable index/futures P&L. Each series uses independent capital. Short borrow, futures rolls and FX conversion are not modeled.</p>'
@@ -467,14 +375,30 @@ def build(token):
             body+=pd.DataFrame([m]).to_html(index=False,escape=True)+tr.to_html(index=False,escape=True)
             (stage/(asset['id']+'.html')).write_text(page(asset['name'],body))
             write_json(stage/(asset['id']+'.json'),dict(metrics=m,trades=tr.to_dict('records'),optimization=trials))
+            m['qs_report']=None
+            if row.get('status')=='PASS':
+                try:
+                    import quantstats as qs
+                    r_qs=eq.equity.pct_change(); r_qs.iloc[0]=eq.equity.iloc[0]/cfg['capital']-1
+                    tbl=qs.reports.metrics(r_qs,rf=cfg['annual_rf'],mode='full',display=False,as_pandas=True,
+                                           periods_per_year=cfg['annual_bars'])
+                    if hasattr(tbl,'to_html'):
+                        (stage/('qs_'+asset['id']+'.html')).write_text('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>QuantStats</title>'
+                            '<style>body{background:#111d30;color:#aebed2;font-family:Segoe UI,Arial;padding:32px}table{border-collapse:collapse;font-size:13px}'
+                            'td,th{padding:6px 12px;border-bottom:1px solid #24344a;text-align:left}h1{font-size:20px}</style></head><body>'
+                            '<h1>QuantStats &mdash; '+asset['name']+'</h1><p>Full QuantStats metrics output (quantstats '+getattr(qs,'__version__','')+'). '
+                            'Basis: OOS simulated equity returns, daily. Sharpe-family ratios use the annual risk-free rate from config.</p>'
+                            +tbl.to_html(border=0)+'</body></html>',encoding='utf-8')
+                        m['qs_report']='qs_'+asset['id']+'.html'
+                    else: m['qs_report_error']='quantstats metrics returned no renderable table'
+                except Exception as _qs_exc: m['qs_report_error']=type(_qs_exc).__name__+': '+str(_qs_exc)[:200]
         except DataError as exc: row.update(status='REJECTED',reason=str(exc))
         audit.append(row); print(asset['id'],asset['name'],row['status'])
-    write_json(stage/'portfolio.json',portfolio_analytics(closes,cfg,names))
     write_json(ROOT/'private/latest_audit.json',audit)
     if not summaries: raise DataError('No valid fresh series: previous deployment retained; inspect private/latest_audit.json')
     stamp=datetime.now(timezone.utc).isoformat()
     links=''.join('<tr data-region="'+html.escape(m['region'],quote=True)+'"><td>'+html.escape(m['region'])+'</td><td><a href="'+m['id']+'.html">'+html.escape(m['name'])+'</a></td><td>'+m['last_date']+'</td><td>'+(str(round(m['total_return']*100,2)) if m.get('total_return') is not None else 'N/A — price observations only')+'</td></tr>' for m in summaries)
-    body='<p>By Murat KONUKLAR · EODHD only · Generated '+stamp+'</p><p id="age"></p><p>Displayed '+str(len(summaries))+'/'+str(len(assets))+' instruments. Price-only commodity observations are separate from OHLC backtests. Daily retrieval does not imply daily source frequency. No proxy or synthetic market data.</p>'
+    body='<p>By Murat KONUKLAR · EODHD daily data only · Generated '+stamp+'</p><p id="age"></p><p>Displayed '+str(len(summaries))+'/'+str(len(assets))+' instruments. Price-only commodity observations are separate from OHLC backtests. Weekly or monthly source series are rejected, never resampled. No proxy or synthetic market data.</p>'
     body+='<label>Region <select id="region"><option>All</option>'+''.join('<option>'+html.escape(x)+'</option>' for x in GROUPS)+'</select></label><section><table><tr><th>Region</th><th>Instrument</th><th>Data date</th><th>OOS return %</th></tr>'+links+'</table></section><h2>Data Audit</h2><section>'+pd.DataFrame(audit).to_html(index=False,escape=True)+'</section>'
     body+='''<script>document.querySelector('#region').onchange=e=>document.querySelectorAll('tr[data-region]').forEach(r=>r.hidden=e.target.value!=='All'&&r.dataset.region!==e.target.value);const hours=(Date.now()-Date.parse('''+json.dumps(stamp)+'''))/3600000;document.querySelector('#age').textContent=hours>36?'WARNING: build is over 36 hours old; scheduled update may have failed.':'Build age: '+hours.toFixed(1)+' hours';</script>'''
     (stage/'index.html').write_text(page('Global Bollinger — EODHD Analytics',body))
@@ -482,7 +406,7 @@ def build(token):
     # Pairwise exact common observations, no fill across market holidays.
     pd.DataFrame(returns).corr(min_periods=100).to_csv(stage/'correlations.csv')
     from report_ui import write_portal
-    write_portal(stage)
+    write_portal(stage, cfg)
     for file in stage.iterdir():
         if token and token.encode() in file.read_bytes(): raise DataError('Secret detected: publication blocked')
     target=ROOT/'netlify_site.zip'

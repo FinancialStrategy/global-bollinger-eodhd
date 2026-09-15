@@ -1,5 +1,6 @@
 """Synthetic fixtures only for unit tests, never used as market-data fallback."""
 import unittest
+from unittest import mock
 import tempfile, contextlib, io, json, zipfile
 from pathlib import Path
 from unittest.mock import patch
@@ -59,25 +60,9 @@ class EngineTests(unittest.TestCase):
     def test_first_day_return(self):
         eq=pd.DataFrame({'equity':[99000.,99000.],'exposed':[1,0]},index=pd.date_range('2020-01-01',periods=2))
         self.assertAlmostEqual(b.metrics(eq,pd.DataFrame(),self.cfg())['total_return'],-.01)
-    def _ohlc(self,idx):
-        rng=np.random.default_rng(3); close=100*np.exp(np.cumsum(rng.normal(0,.01,len(idx))))
-        return pd.DataFrame(dict(open=close,close=close,high=close*1.01,low=close*.99,volume=100.),index=idx)
-    def test_daily_frequency_enforced(self):
-        df=self._ohlc(pd.date_range('2018-01-05',periods=500,freq='W-FRI'))
-        with self.assertRaisesRegex(b.DataError,'daily'):
-            b.validate(df,self.cfg())
-    def test_daily_frequency_accepted(self):
-        df=self._ohlc(pd.bdate_range('2018-01-01',periods=800))
-        out,age=b.validate(df,self.cfg()); self.assertEqual(len(out),800)
-    def test_commodity_daily_enforced(self):
-        import commodities as cm
-        payload={'meta':{'interval':'daily','name':'X','unit':'USD'},
-                 'data':[{'date':d,'value':1.0} for d in pd.date_range('2018-01-05',periods=100,freq='W-FRI').strftime('%Y-%m-%d')]}
-        with self.assertRaisesRegex(ValueError,'COMMODITY_NOT_DAILY'):
-            cm.parse_observations(payload,'daily','2018-01-01')
     def test_html_build_smoke(self):
-        rng=np.random.default_rng(11); close=100*np.exp(np.cumsum(rng.normal(0,.008,800)))
-        d=pd.DataFrame(dict(open=close,close=close,high=close*1.01,low=close*.99,volume=100.),index=pd.bdate_range('2018-01-01',periods=800))
+        rng=np.random.default_rng(11); close=100*np.exp(np.cumsum(rng.normal(0,.008,600)))
+        d=pd.DataFrame(dict(open=close,close=close,high=close*1.01,low=close*.99,volume=100.),index=pd.bdate_range('2023-01-01',periods=600))
         u=b.universe()
         def resolved(a,records):
             if a['id']!='A01': raise b.DataError('TEST unresolved')
@@ -88,7 +73,6 @@ class EngineTests(unittest.TestCase):
                 self.assertIn('index.html',z.namelist())
                 self.assertIn('portal.js',z.namelist())
                 self.assertIn('plotly.min.js',z.namelist())
-                self.assertIn('portfolio.json',z.namelist())
                 self.assertEqual(len(json.loads(z.read('audit.json'))),47)
                 for name in z.namelist(): self.assertNotIn(b'UNIT_TEST_SECRET',z.read(name))
                 self.assertIn('OOS simulated equity',z.read('portal-data.js').decode())
@@ -105,6 +89,24 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(list(df.columns),['value']); self.assertEqual(missing,1)
         self.assertEqual(df.iloc[0].value,-37.63)
         with self.assertRaises(ValueError): cm.parse_observations(payload,'monthly','2010-01-01')
+    def test_nondaily_commodities_sourced_daily_from_yahoo(self):
+        daily={'meta':{'interval':'daily','name':'Copper','unit':'USD'},
+               'data':[{'date':d,'value':float(100+i%40)} for i,d in
+                       enumerate(pd.bdate_range(end=pd.Timestamp.today().normalize(),periods=400).strftime('%Y-%m-%d'))]}
+        with mock.patch.object(cm,'_yahoo_daily_payload',return_value=daily) as yh:
+            out,body=cm.commodity_view({'name':'Copper'},b.DEFAULT,'unused',None)
+        yh.assert_called_once()
+        self.assertEqual(out['interval'],'daily')
+        self.assertIn('Yahoo Finance daily',out['provider_name'])
+        payload={'meta':{'name':'Gasoline','unit':'USD/gal','interval':'weekly'},'data':[
+            {'date':'2024-01-01','value':3.1},{'date':'2024-01-08','value':3.2}]}
+        with self.assertRaisesRegex(ValueError,'DAILY_SOURCE_REQUIRED'):
+            cm.parse_observations(payload,'weekly','2024-01-01')
+    def test_ohlc_requires_daily_spacing(self):
+        d=pd.DataFrame(dict(open=[1.,2.,3.],high=[1.,2.,3.],low=[1.,2.,3.],close=[1.,2.,3.]),
+            index=pd.to_datetime(['2024-01-01','2024-02-01','2024-03-01']))
+        with self.assertRaisesRegex(b.DataError,'daily'):
+            b.validate(d,dict(b.DEFAULT,min_rows=1,start='2024-01-01'))
     def test_unavailable_commodity_not_substituted(self):
         with self.assertRaises(ValueError): cm.commodity_view({'name':'Cocoa'},b.DEFAULT,'unused',None)
     def test_metals_exact_catalog(self):

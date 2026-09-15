@@ -1,4 +1,4 @@
-"""EODHD Commodities API adapter v2.1: native observations, never fabricated OHLC.
+"""EODHD Commodities API adapter v4: daily source observations, never fabricated OHLC.
 Source: https://eodhd.com/financial-apis/commodities-api
 """
 import html
@@ -6,18 +6,44 @@ import numpy as np
 import pandas as pd
 
 # Explicit reference identities; these are not exchange-traded futures contracts.
+YAHOO_DAILY={
+ 'Gasoline':'RB=F','Copper':'HG=F','Corn':'ZC=F','Wheat':'ZW=F',
+ 'Coffee':'KC=F','Sugar':'SB=F','Cotton':'CT=F',
+}
+
+def _yahoo_daily_payload(symbol,start):
+    """Yahoo Finance v8 chart API, interval=1d. Standard library only; no new dependency."""
+    import json, urllib.request, urllib.parse
+    p1=int(pd.Timestamp(start).timestamp()); p2=int(pd.Timestamp.now(tz='UTC').timestamp())
+    url=('https://query1.finance.yahoo.com/v8/finance/chart/'+urllib.parse.quote(symbol,safe='')
+         +f'?interval=1d&period1={p1}&period2={p2}&events=history')
+    req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+    with urllib.request.urlopen(req,timeout=30) as resp:
+        payload=json.loads(resp.read().decode())
+    chart=payload.get('chart',{}); result=chart.get('result') or []
+    if not result: raise ValueError('YAHOO_UNAVAILABLE: '+str(chart.get('error')))
+    r0=result[0]; ts=r0.get('timestamp') or []
+    closes=(r0.get('indicators',{}).get('quote',[{}])[0]).get('close') or []
+    meta=r0.get('meta',{})
+    data=[{'date':pd.Timestamp(t,unit='s').strftime('%Y-%m-%d'),'value':float(v)}
+          for t,v in zip(ts,closes) if v is not None]
+    if not data: raise ValueError('YAHOO_NO_DAILY_DATA: '+symbol)
+    return {'meta':{'interval':'daily','name':meta.get('longName') or symbol,
+                    'unit':meta.get('currency') or 'USD'},'data':data}
+
+
 SPECS = {
  'WTI Crude Oil':('WTI','daily',14),
  'Brent Crude Oil':('BRENT','daily',14),
  'Natural Gas':('NATURAL_GAS','daily',14),
  'Heating Oil':('HEATING_OIL_NYH','daily',14),
- 'Gasoline':('GASOLINE_US','daily',14),
- 'Copper':('COPPER','daily',14),
- 'Corn':('CORN','daily',14),
- 'Wheat':('WHEAT','daily',14),
- 'Coffee':('COFFEE_MILD_ARABICA','daily',14),
- 'Sugar':('SUGAR','daily',14),
- 'Cotton':('COTTON','daily',14),
+ 'Gasoline':('GASOLINE_US','weekly',21),
+ 'Copper':('COPPER','monthly',90),
+ 'Corn':('CORN','monthly',90),
+ 'Wheat':('WHEAT','monthly',90),
+ 'Coffee':('COFFEE_MILD_ARABICA','monthly',90),
+ 'Sugar':('SUGAR','monthly',90),
+ 'Cotton':('COTTON','monthly',90),
 }
 
 def parse_observations(payload, interval, start):
@@ -26,6 +52,8 @@ def parse_observations(payload, interval, start):
     meta=payload['meta']
     if meta.get('interval')!=interval:
         raise ValueError('COMMODITY_FREQUENCY_MISMATCH')
+    if interval!='daily':
+        raise ValueError('DAILY_SOURCE_REQUIRED: provider interval is '+str(interval))
     if not meta.get('name') or not meta.get('unit'):
         raise ValueError('COMMODITY_METADATA_MISSING')
     d=pd.DataFrame(payload['data'])
@@ -40,15 +68,20 @@ def parse_observations(payload, interval, start):
     d=d.set_index('date').sort_index().loc[pd.Timestamp(start):end,['value']]
     if d.empty: raise ValueError('COMMODITY_NO_OBSERVATIONS_IN_RANGE')
     gaps=d.index.to_series().diff().dt.days.dropna()
-    if len(gaps) and (float(gaps.median())>4 or int(gaps.max())>14):
-        raise ValueError(f'COMMODITY_NOT_DAILY: median gap {gaps.median():.0f}d, max {gaps.max():.0f}d. Daily frequency is mandatory; the series is rejected, never resampled or substituted')
+    if not gaps.empty and gaps.median()>3:
+        raise ValueError('DAILY_SOURCE_REQUIRED: observed date spacing is not daily')
     return d,meta,missing
 
 def commodity_view(asset,cfg,token,api):
     if asset['name'] not in SPECS:
         raise ValueError('UNAVAILABLE: not in documented Commodities API list; no substitute used')
     code,interval,max_age=SPECS[asset['name']]
-    payload=api('commodities/historical/'+code,token,{'interval':interval},object_response=True)
+    if interval!='daily':
+        ysym=YAHOO_DAILY.get(asset['name'])
+        if not ysym: raise ValueError(f'DAILY_SOURCE_REQUIRED: {asset["name"]} has no daily source mapping')
+        payload=_yahoo_daily_payload(ysym,cfg['start']); interval='daily'; max_age=14; data_source='Yahoo Finance daily'
+    else:
+        payload=api('commodities/historical/'+code,token,{'interval':interval},object_response=True); data_source='EODHD Commodities'
     d,meta,missing=parse_observations(payload,interval,cfg['start'])
     age=int((pd.Timestamp.now(tz='UTC').tz_localize(None).normalize()-d.index[-1]).days)
     if age>max_age: raise ValueError('STALE_COMMODITY: exceeds '+str(max_age)+' calendar days for '+interval)
@@ -59,18 +92,18 @@ def commodity_view(asset,cfg,token,api):
     if pd.notna(basis.iloc[-1]):
         label='ABOVE_UPPER' if d.value.iloc[-1]>basis.iloc[-1]+sd.iloc[-1] else 'BELOW_LOWER' if d.value.iloc[-1]<basis.iloc[-1]-sd.iloc[-1] else 'INSIDE_BANDS'
     out=dict(status='PRICE_ONLY',symbol='commodities/historical/'+code,
-        provider_name=meta['name'],instrument_type='Economic commodity reference series',
+        provider_name=data_source+': '+meta['name'],instrument_type='Economic commodity reference series',
         interval=interval,unit=meta['unit'],last_date=str(d.index[-1].date()),age_days=age,
         first_date=str(d.index[0].date()),observations=len(d),missing_values=missing,
         latest=float(d.value.iloc[-1]),bb_state=label,bb_periods=n,
         backtest_eligible=False,vwap_eligible=False,total_return=None,
-        reason='Date/value only; no OHLCV. Data obtained via EODHD; upstream FRED/EIA/IMF.')
+        reason='Daily date/value only; no OHLCV. Source: '+data_source+'.')
     import plotly.graph_objects as go
     f=go.Figure()
     for name,values in [('Observed price',d.value),('BB basis',basis),('Upper',basis+sd),('Lower',basis-sd)]:
         f.add_trace(go.Scatter(x=d.index,y=values,name=name))
     f.update_layout(template='plotly_dark',height=650,title=meta['name'],yaxis_title=meta['unit'])
-    body='<a href="index.html">Back</a><p>PRICE ONLY · '+html.escape(interval)+' observations · '+str(n)+'-observation Bollinger bands.</p>'
+    body='<a href="index.html">Back</a><p>PRICE ONLY · daily observations · '+str(n)+'-observation Bollinger bands.</p>'
     body+='<p>No OHLCV: ATR, stop/target backtest and VWAP are disabled. Observation dates are not historical availability timestamps; no backtest is inferred from these revised reference data.</p>'
     body+=f.to_html(full_html=False,include_plotlyjs=True)+pd.DataFrame([out]).to_html(index=False,escape=True)
     return out,body

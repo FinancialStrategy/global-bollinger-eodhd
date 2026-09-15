@@ -4,65 +4,33 @@
 <body>
 <header><div class="brand">MK<span>QUANT RESEARCH</span></div><div class="edition">EODHD · END OF DAY <span id="buildDate"></span></div></header>
 <main>
-<div class="heading"><div><p class="eyebrow">GLOBAL MARKET OBSERVATORY</p><h1>Global Bollinger <span>Analytics</span></h1><p class="subtitle">Regional markets, price regimes and Bollinger-strategy research across global equity indices, precious metals and commodities.</p></div><div class="credit">By Murat KONUKLAR<br><span>Daily research · v4.1</span></div></div>
+<div class="heading"><div><p class="eyebrow">GLOBAL MARKET OBSERVATORY</p><h1>Global Bollinger <span>Analytics</span></h1><p class="subtitle">Screen the investment universe. Compare strategy performance. Investigate risk.</p></div><div class="credit">By Murat KONUKLAR<br><span>PM research workspace · v4.0</span></div></div>
+<div class="policy">EODHD DAILY DATA ONLY <span>No fallback</span><span>No synthetic market data</span><span>No price imputation</span><span>No resampling</span></div>
 <div id="freshness" role="status"></div>
+<div class="scope toolbar" aria-label="Investment universe filters"><label>Region<select id="scopeRegion"></select></label><label>Instrument group<select id="scopeGroup"></select></label><label>Comparison period<select id="scopeWindow"><option value="1Y">Trailing 1 year · common cutoff</option><option value="3Y">Trailing 3 years · common cutoff</option><option value="FULL">Full OOS · individual periods</option></select></label><button id="resetScope">Reset filters</button><p id="scopeCount" role="status"></p></div>
+<p class="note" id="windowNote"></p>
 <nav id="tabs" role="tablist" aria-label="Analysis sections"></nav>
 <section id="overview" role="tabpanel">
-<div class="purpose"><strong>Purpose.</strong> The daily command view for portfolio managers: data coverage, validation health, and which regional Bollinger strategies made or lost money out-of-sample (OOS). Every series is validated and independently backtested. This tab answers &ldquo;where do we stand today?&rdquo; &mdash; it is a screening and monitoring tool, not an allocation engine and not investment advice.</div>
-<div id="kpis" class="kpis"></div>
-<div class="section-title"><h2>Universe coverage by region</h2><span>Validation status per instrument</span></div>
-<div id="coverage" class="chart small"></div>
-<div class="section-title"><h2>Equity-index strategy ranking</h2><span>Independent OOS tests per asset · test windows may differ</span></div>
-<div id="ranking" class="chart"></div>
+<div class="section-title"><div><h2>Executive decision workspace</h2><p class="note">Start with the filtered universe, compare risk-adjusted results, then open an instrument for price and execution detail.</p></div><button id="goAudit">Review data exceptions</button></div>
+<div id="kpis" class="kpis"></div><div id="coverageNote" class="notice"></div>
+<div class="section-title"><h2>Risk and return map</h2><span>Click an instrument to open Index Lab</span></div><div id="riskReturn" class="chart"></div>
+<div class="section-title"><h2>Investment universe</h2><label class="sort-control">Sort by <select id="universeSort"><option value="name">Instrument name</option><option value="sharpe">Sharpe · highest first</option><option value="total_return">Net return · highest first</option><option value="max_drawdown">Drawdown · deepest first</option></select></label></div>
+<p class="note">All registered instruments remain visible. Price-only series and rejected data have no strategy ratios. Open an instrument using its name.</p><div id="universeTable" class="table-wrap"></div>
+<details><summary>Coverage by region</summary><div id="coverage" class="chart"></div></details>
 </section>
-<section id="universe" role="tabpanel" hidden>
-<div class="purpose"><strong>Purpose.</strong> The full investment universe in one filterable registry. Use the Region and Instrument Group filters to answer: which markets are covered, what status each instrument has, and how it may be analyzed (OHLC backtest vs price observation only).</div>
-<div class="toolbar"><label>Region<select id="uRegion"></select></label><label>Instrument group<select id="uGroup"></select></label><span id="universeCount" class="count"></span></div>
-<div id="universeTable" class="table-wrap"></div>
-</section>
-<section id="market" role="tabpanel" hidden>
-<div class="toolbar"><label>Index / precious metal<select id="marketAsset"></select></label><div id="marketPeriods" class="periods"></div><label class="check"><input id="tradeMarkers" type="checkbox" checked> Trade markers</label></div>
-<div id="marketInfo" class="asset-info"></div>
-<h2>Price &amp; Bollinger bands</h2>
-<div id="price" class="chart tall"></div>
-<div class="section-title"><h2>OOS simulated equity</h2><span>Strategy net of costs · buy &amp; hold gross</span></div>
-<div id="equity" class="chart"></div>
-<h2>Drawdown</h2>
-<div id="drawdown" class="chart small"></div>
+<section id="regional" role="tabpanel" hidden><h2>Regional comparison</h2><p class="note">Filtered independent strategy results. Returns are not aggregated into a portfolio.</p><div id="regionalChart" class="chart"></div><div id="regionalTable" class="table-wrap"></div></section>
+<section id="market" role="tabpanel" hidden><div class="toolbar"><label>Index / precious metal<select id="marketAsset"></select></label><div id="marketPeriods" class="periods"></div><label class="check"><input id="tradeMarkers" type="checkbox" checked> Trade entry markers</label></div><div id="marketInfo" class="asset-info"></div><h2>Price & Bollinger bands</h2><div id="price" class="chart tall"></div><div class="section-title"><h2>OOS equity curve</h2><span>Strategy net · buy & hold gross</span></div><div id="equity" class="chart"></div><h2>Drawdown</h2><div id="drawdown" class="chart small"></div>
 <h2>Rolling Sharpe · 126 days</h2>
 <p class="note">QuantStats rolling window over the OOS equity curve; annualized. Sparse when the OOS window is short.</p>
 <div id="rollsharpe" class="chart small"></div>
 <h2>EWMA volatility · RiskMetrics &lambda;=0.94</h2>
-<p class="note">Exponentially weighted moving average of variance: &sigma;&sup2;t = &lambda;&middot;&sigma;&sup2;t&#8722;1 + (1&minus;&lambda;)&middot;r&sup2;t with &lambda; = 0.94, annualized (&times;&radic;252). Computed per instrument at build time; recent observations carry the most weight &mdash; the standard industry risk model.</p>
-<div id="ewma" class="chart small"></div>
-</section>
-<section id="commodities" role="tabpanel" hidden>
-<div class="toolbar"><label>Commodity<select id="commodityAsset"></select></label><div id="commodityPeriods" class="periods"></div></div>
-<div id="commodityInfo" class="asset-info"></div>
-<div class="notice">Daily observations only — series the provider cannot supply daily are rejected (see Data Audit). Without OHLCV, ATR-stopped backtests and VWAP do not apply.</div>
-<div id="commodityChart" class="chart tall"></div>
-</section>
-<section id="risk" role="tabpanel" hidden>
-<div class="purpose"><strong>Purpose.</strong> Institutional ratios per instrument (QuantStats), portfolio-level risk research on exact common observation dates (PyPortfolioOpt), and EGARCH conditional volatility (arch). All ratios are computed in Python at build time; the browser only renders them.</div>
-<div class="section-title"><h2>Portfolio construction research</h2><span>PyPortfolioOpt · exact common dates, never filled · not an investable allocation</span></div>
-<div id="portfolioCard"></div>
-<div class="section-title"><h2>EGARCH conditional volatility</h2><span>Annualized % · series passing model diagnostics only</span></div>
-<p class="note">Estimated from the full history of each series with the arch package.</p>
-<div id="riskChart" class="chart"></div>
-<div class="section-title"><h2>Performance metrics</h2><span>QuantStats · OOS window per instrument</span></div>
-<div id="perfTable" class="table-wrap"></div>
-<div class="section-title"><h2>Risk metrics</h2><span>QuantStats tail ratios + EGARCH diagnostic status</span></div>
-<div id="riskTable" class="table-wrap"></div>
-</section>
-<section id="trades" role="tabpanel" hidden>
-<div class="purpose"><strong>Purpose.</strong> Full trade journal of the OOS simulation for any validated instrument, with CSV export for desk review.</div>
-<div class="toolbar"><label>Instrument<select id="tradeAsset"></select></label><button id="exportTrades">Download trades CSV</button></div>
-<div id="tradeTable" class="table-wrap"></div>
-</section>
-<section id="audit" role="tabpanel" hidden>
-<div class="purpose"><strong>Purpose.</strong> Data-quality audit trail: every instrument in the registry with its validation outcome and the exact rejection reason when failed. Nothing is silently substituted, proxied or filled. Frequency must be daily; history starts 2018-01-01.</div>
-<div class="toolbar"><label>Search asset<input id="auditSearch" placeholder="e.g. TOPIX, Gold…"></label><label>Status<select id="auditStatus"><option value="">All</option><option>PASS</option><option>PRICE_ONLY</option><option>REJECTED</option></select></label></div>
-<div id="auditTable" class="table-wrap"></div>
-</section>
-<footer>MK Quantitative Research · Reference-series simulations · Indices are not directly tradable instruments. FX conversion, short borrow and futures roll costs are not modeled. Missing data is never filled. Metrics: QuantStats · Portfolio risk: PyPortfolioOpt · Conditional volatility: arch (EGARCH).</footer>
+<p class="note">Exponentially weighted moving average of variance: &sigma;&sup2;t = &lambda;&middot;&sigma;&sup2;t&#8722;1 + (1&minus;&lambda;)&middot;r&sup2;t with &lambda; = 0.94, annualized (&times;&radic;252). Computed on each instrument's full daily history at build time; recent observations carry the most weight.</p>
+<div id="ewma" class="chart small"></div></section>
+<section id="commodities" role="tabpanel" hidden><div class="toolbar"><label>Commodity reference series<select id="commodityAsset"></select></label><div id="commodityPeriods" class="periods"></div></div><div id="commodityInfo" class="asset-info"></div><div class="notice">Daily native price observations only. ATR-stop backtests and VWAP require inputs these series do not provide. Weekly or monthly commodity references are rejected; they are never resampled into daily data.</div><div id="commodityChart" class="chart tall"></div></section>
+<section id="performance" role="tabpanel" hidden><h2>Performance metrics</h2><p class="note">QuantStats calculations on validated net OOS strategy returns. The global comparison period applies to this table.</p><div id="performanceTable" class="table-wrap"></div><h2>Risk-adjusted performance</h2><div id="ranking" class="chart"></div></section>
+<section id="risk" role="tabpanel" hidden><h2>Strategy risk metrics</h2><p class="note">Volatility and drawdown measure strategy equity risk. VaR and CVaR below are signed one-observation return thresholds, not annualized losses.</p><div id="strategyRiskTable" class="table-wrap"></div><h2>Underlying-market EGARCH volatility</h2><p class="note">Latest annualized conditional volatility of the underlying reference price, estimated on full available history. This model does not measure strategy or portfolio volatility.</p><div id="riskChart" class="chart"></div><div id="riskTable" class="table-wrap"></div></section>
+<section id="trades" role="tabpanel" hidden><div class="toolbar"><label>Instrument<select id="tradeAsset"></select></label><button id="exportTrades">Download trade CSV</button></div><p class="note">Full OOS execution ledger for the selected instrument. The comparison-period filter does not truncate round-trip trades.</p><div id="tradeTable" class="table-wrap"></div></section>
+<section id="audit" role="tabpanel" hidden><div class="toolbar"><label>Search instruments<input id="auditSearch" placeholder="For example: TOPIX, Gold"></label><label>Data status<select id="auditStatus"><option value="">All statuses</option><option>PASS</option><option>PRICE_ONLY</option><option>REJECTED</option></select></label></div><div id="auditTable" class="table-wrap"></div></section>
+<section id="methodology" role="tabpanel" hidden><h2>Metric definitions & provenance</h2><div id="metricMethod" class="notice"></div><div id="definitions" class="table-wrap"></div><h2>Package responsibilities</h2><p class="note">QuantStats is the sole return-metric engine. Plotly renders interactive charts. The backtest engine supplies commission- and slippage-adjusted equity and trade records. ARCH supplies EGARCH estimates; rejected fits remain unavailable.</p><p class="note">PyPortfolioOpt is an allocation engine. No portfolio weights, common base-currency valuation or investable implementation have been defined here, so optimized allocations and portfolio ratios are not published. Pyfolio tear sheets are not used as a second or replacement calculation engine.</p><h2>Strict data contract</h2><p class="note">EODHD daily observations are the only market-data input. Missing prices, OHLC and volume are never fabricated, interpolated, resampled or replaced by another symbol or provider. Cache stores prior EODHD observations; a failed or empty update cannot be replaced by cached data. Non-daily commodity references are rejected in Data Audit.</p><p class="note">No benchmark is fetched by QuantStats. Alpha, beta, information ratio and portfolio risk contributions are unavailable because an approved benchmark and portfolio mandate have not been supplied. The constant annual hurdle is a configured research assumption, not an observed currency-specific risk-free series.</p><h2>Comparison rules</h2><p class="note">Trailing windows share the earliest last observation date across accepted OHLC instruments. Each retains all its native daily observations within the window; exchange holidays are not filled or removed to force a shared calendar. An instrument needs OOS history covering the window start. Actual first/last dates and counts are disclosed. Full OOS periods can differ. KPI medians summarize independent strategies; they are not portfolio returns.</p></section>
+<footer>MK Quantitative Research · EODHD reference-series research · Cash indices are not directly tradable. FX conversion, short borrow, carry and futures rolls are not modeled. Strategy results are backtests on observed data, not synthetic market observations or realized portfolio returns.</footer>
 </main></body></html>

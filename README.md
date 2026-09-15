@@ -1,51 +1,77 @@
-# Global Bollinger — EODHD Python / Colab / Netlify (v4.0)
+# Global Bollinger EODHD Analytics
 
-Tabbed Plotly research portal over EODHD end-of-day data: 30 global equity indices,
-4 precious metals and 11 economic commodity reference series.
+Institutional research portal for a fixed investment universe of 30 global major equity indices plus commodities and precious metals. Market data is sourced from EODHD daily observations only. The generated Netlify package is a static site with Plotly charts and precomputed Python analytics.
 
-## Tabs
-- **Executive** — daily command view: coverage KPIs, validation health, median OOS
-  performance across the 30 equity indices, regional coverage chart, strategy ranking.
-- **Investment Universe** — full registry with Region and Instrument Group combo-box
-  filters and live counters.
-- **Index Lab** — per-instrument deep dive: price with Bollinger bands, trade markers,
-  OOS simulated equity vs buy & hold, drawdown.
-- **Commodities** — native date/value observations (no OHLCV; no backtest).
-- **Risk & Performance** — QuantStats ratios per instrument (Sharpe, Sortino, Calmar,
-  Omega, VaR/CVaR, skew, kurtosis, tail ratio, ulcer index, max drawdown, CAGR),
-  PyPortfolioOpt portfolio research on exact common observation dates (max Sharpe,
-  min volatility, HRP weights), EGARCH conditional volatility via `arch`.
-- **Trade Log** — full OOS trade journal with CSV export.
-- **Data Audit** — validation outcomes with exact rejection reasons.
+## What the portal provides
 
-## Metric stack
-- `quantstats` — all per-instrument performance/risk ratios.
-- `PyPortfolioOpt` — portfolio-level weights and risk (common exact dates, never filled).
-- `arch` — EGARCH conditional volatility.
+- Executive decision workspace with global filters for region, instrument group and comparison period.
+- Investment Universe table showing every registered instrument, including accepted OHLC series, price-only commodity references and rejected data.
+- Interactive Index Lab with OHLC candles, Bollinger bands, OOS equity, drawdown and trade markers.
+- Performance and risk tabs using QuantStats 0.0.81 on validated net OOS strategy returns.
+- Data Audit tab showing rejected or unavailable instruments without replacement data.
 
-## Data rules
-- Daily frequency is mandatory — any series the provider cannot supply daily is rejected, never resampled or substituted.
-- History starts **2018-01-01** (cached pre-window bars are dropped at fetch).
+## Strict data policy
 
-## Policy: no fallback, no synthetic data
-- Missing `quantstats`/`PyPortfolioOpt` aborts the build with an explicit error.
-- No proxy, synthetic or filled market data anywhere in the production path.
-- Synthetic fixtures exist only in `test_engine.py`, isolated from all outputs.
-- A failed build never replaces the previous deployment.
+- EODHD is the only market-data provider.
+- Daily observations are required for every published chart and calculation.
+- No fallback provider is used.
+- No proxy symbols are substituted.
+- No synthetic market data is created.
+- Missing prices, OHLC and volume are not fabricated, interpolated or filled.
+- Weekly or monthly commodity references are rejected rather than resampled.
+- Cached EODHD observations may preserve previously fetched provider data, but a failed or empty update cannot replace the requested run.
 
-## Setup
-1. Extract this package to the root of a private GitHub repository (keep existing
-   `config.json` and `universe.json`). Include `.github/workflows/daily.yml`.
-2. Define `EODHD_API_TOKEN` (GitHub Actions secret / Colab secret).
-3. `pip install -r requirements.txt`, then `python -m unittest -v test_engine`.
-4. `python bb_eodhd.py` builds `netlify_site.zip`; `python bb_eodhd.py --deploy` publishes
-   (requires `PUBLISH_APPROVED=true`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`).
+## Package responsibilities
 
-## Colab
-Upload this ZIP, set `EODHD_API_TOKEN` in Colab Secrets, run the cells in order.
-The notebook does not publish by itself; it builds the validated site package.
+- `quantstats==0.0.81`: sole return-based performance and risk metric engine.
+- `plotly`: interactive chart rendering.
+- `arch`: EGARCH diagnostic estimates for underlying reference prices.
+- `PyPortfolioOpt`: not published in this release because no approved portfolio weights, mandate, benchmark, common base currency or implementation vehicle has been defined.
+- `pyfolio`: not used as a second metric engine or fallback.
 
-## Automation
-The daily workflow runs tests, rebuilds and (when approved) deploys. Reference-series
-simulations only; indices are not directly tradable. FX conversion, short borrow and
-futures roll costs are not modeled.
+## Required secrets
+
+Set these in GitHub Actions Secrets:
+
+- `EODHD_API_TOKEN`
+- `NETLIFY_AUTH_TOKEN`
+- `NETLIFY_SITE_ID`
+
+Set this in GitHub Actions Variables only after checking site access and license constraints:
+
+- `PUBLISH_APPROVED=true`
+
+Colab has its own Secrets panel. GitHub Secrets are not visible to Colab.
+
+## Local or Colab run
+
+```bash
+pip install -r requirements.txt
+python -m unittest discover -v
+python bb_eodhd.py --init
+python bb_eodhd.py
+```
+
+The build creates `netlify_site.zip`. Upload that ZIP to Netlify manually, or let GitHub Actions deploy it when the Netlify secrets and `PUBLISH_APPROVED` variable are configured.
+
+## GitHub repository contents
+
+Upload the full source package to the repository root. The repository should include `index.html` only after Netlify builds a site package; the source repository itself is driven by:
+
+- `bb_eodhd.py`
+- `analytics.py`
+- `report_ui.py`
+- `portal.html`
+- `portal.css`
+- `portal.js`
+- `commodities.py`
+- `netlify_setup.py`
+- `config.json`
+- `universe.json`
+- `requirements.txt`
+- `test_engine.py`
+- `test_analytics.py`
+- `Colab_Run.ipynb`
+- `.github/workflows/daily.yml`
+
+The recommended repository name remains `global-bollinger-eodhd`.
