@@ -360,12 +360,13 @@ def build(token):
             f.add_trace(go.Scatter(x=eq.index,y=100*(eq.equity/eq.equity.cummax().clip(lower=cfg['capital'])-1),name='Drawdown %'),row=3,col=1)
             f.add_trace(go.Scatter(x=eq.index,y=100*(bh/bh.cummax()-1),name='B&H drawdown %',fill='tozeroy',opacity=.55),row=3,col=1)
             r_roll=eq.equity.pct_change(); r_roll.iloc[0]=eq.equity.iloc[0]/cfg['capital']-1
-            try:
-                import quantstats as qs
-                roll_sharpe=qs.stats.rolling_sharpe(r_roll,rf=cfg['annual_rf'],periods=cfg['annual_bars'],window=min(126,len(r_roll)))
-                if roll_sharpe is not None and int(roll_sharpe.notna().sum())>1:
-                    f.add_trace(go.Scatter(x=roll_sharpe.index,y=roll_sharpe,name='Rolling Sharpe 126d',fill='tozeroy'),row=4,col=1)
-            except Exception: pass
+            rf_d=(1+cfg['annual_rf'])**(1/cfg['annual_bars'])-1
+            ex=r_roll-rf_d
+            w=min(126,len(r_roll))
+            sd=ex.rolling(w).std(ddof=1)
+            roll_sharpe=ex.rolling(w).mean()/sd*np.sqrt(cfg['annual_bars'])
+            if int(roll_sharpe.notna().sum())>1:
+                f.add_trace(go.Scatter(x=roll_sharpe.index,y=roll_sharpe,name='Rolling Sharpe 126d',fill='tozeroy'),row=4,col=1)
             ewma_pct=np.sqrt((df.close.pct_change(fill_method=None)**2).ewm(alpha=1-0.94,adjust=False).mean())*np.sqrt(cfg['annual_bars'])*100
             m['ewma_annual_pct']=float(ewma_pct.iloc[-1]) if np.isfinite(ewma_pct.iloc[-1]) else None
             f.add_trace(go.Scatter(x=ewma_pct.index,y=ewma_pct,name='EWMA volatility (ann. %)',fill='tozeroy'),row=5,col=1)
