@@ -39,7 +39,7 @@ def _qcall(fn, *args, **kwargs):
     return fn(*args, **kwargs)
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '4.0'
+VERSION = '4.1'
 # Reviewed against user's 2026-09-14 catalog (SHA256 dfb1d249...b1).
 # Explicit user mappings still take precedence. Catalog metadata is rechecked each run.
 REVIEWED_INDICES = {
@@ -52,7 +52,7 @@ REVIEWED_INDICES = {
  'Hang Seng': ('HSI.INDX','Hang Seng (Hong Kong)','HKD',None),
  'CSI 300': ('CSI300.INDX','Shanghai Shenzhen CSI 300','CNY',None),
 }
-DEFAULT = dict(start='2010-01-01', capital=100000., risk=.01, exposure=1.,
+DEFAULT = dict(start='2018-01-01', capital=100000., risk=.01, exposure=1.,
                commission=.0005, slippage=.0005, annual_rf=.03, annual_bars=252,
                bb_length=55, bb_std=1., atr_length=14, stop_atr=2., target_r=2.,
                trail_atr=2.5, trend_length=200, trend_filter=True, rsi_filter=False,
@@ -167,6 +167,9 @@ def validate(df, cfg):
     if len(df)<cfg['min_rows']: raise DataError('Insufficient history')
     if df.index.min()>pd.Timestamp(cfg['start'])+pd.Timedelta(days=10):
         raise DataError(f'Truncated requested history: requested={cfg["start"]}, first={df.index.min().date()}, last={df.index.max().date()}, rows={len(df)}')
+    gaps=df.index.to_series().diff().dt.days.dropna()
+    if len(gaps) and (float(gaps.median())>4 or int(gaps.max())>14):
+        raise DataError(f'Not daily frequency: median gap {gaps.median():.0f}d, max {gaps.max():.0f}d. Daily frequency is mandatory; the series is rejected, never resampled or substituted')
     moves=df.close.pct_change(fill_method=None)
     if moves.abs().gt(.35).any():
         when=moves.abs().idxmax(); i=df.index.get_loc(when)
@@ -193,6 +196,7 @@ def fetch(asset, symbol, token, cfg):
         if fresh.index.has_duplicates: raise DataError('Provider duplicate dates')
         if (fresh.index>pd.Timestamp(end)).any(): raise DataError('Unexpected current/future bar')
     df=pd.concat([old,fresh]); df=df[~df.index.duplicated(keep='last')]
+    df=df[df.index>=pd.Timestamp(cfg['start'])]  # history window starts at cfg['start']; cached pre-window bars are dropped
     # Preserve raw diagnostic observations for rejected series, outside published files.
     if not df.empty:
         diagnostic=df.sort_index()

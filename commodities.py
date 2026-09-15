@@ -11,13 +11,13 @@ SPECS = {
  'Brent Crude Oil':('BRENT','daily',14),
  'Natural Gas':('NATURAL_GAS','daily',14),
  'Heating Oil':('HEATING_OIL_NYH','daily',14),
- 'Gasoline':('GASOLINE_US','weekly',21),
- 'Copper':('COPPER','monthly',90),
- 'Corn':('CORN','monthly',90),
- 'Wheat':('WHEAT','monthly',90),
- 'Coffee':('COFFEE_MILD_ARABICA','monthly',90),
- 'Sugar':('SUGAR','monthly',90),
- 'Cotton':('COTTON','monthly',90),
+ 'Gasoline':('GASOLINE_US','daily',14),
+ 'Copper':('COPPER','daily',14),
+ 'Corn':('CORN','daily',14),
+ 'Wheat':('WHEAT','daily',14),
+ 'Coffee':('COFFEE_MILD_ARABICA','daily',14),
+ 'Sugar':('SUGAR','daily',14),
+ 'Cotton':('COTTON','daily',14),
 }
 
 def parse_observations(payload, interval, start):
@@ -39,6 +39,9 @@ def parse_observations(payload, interval, start):
     end=pd.Timestamp.now(tz='UTC').tz_localize(None).normalize()-pd.Timedelta(days=1)
     d=d.set_index('date').sort_index().loc[pd.Timestamp(start):end,['value']]
     if d.empty: raise ValueError('COMMODITY_NO_OBSERVATIONS_IN_RANGE')
+    gaps=d.index.to_series().diff().dt.days.dropna()
+    if len(gaps) and (float(gaps.median())>4 or int(gaps.max())>14):
+        raise ValueError(f'COMMODITY_NOT_DAILY: median gap {gaps.median():.0f}d, max {gaps.max():.0f}d. Daily frequency is mandatory; the series is rejected, never resampled or substituted')
     return d,meta,missing
 
 def commodity_view(asset,cfg,token,api):

@@ -4,7 +4,7 @@
 <body>
 <header><div class="brand">MK<span>QUANT RESEARCH</span></div><div class="edition">EODHD · END OF DAY <span id="buildDate"></span></div></header>
 <main>
-<div class="heading"><div><p class="eyebrow">GLOBAL MARKET OBSERVATORY</p><h1>Global Bollinger <span>Analytics</span></h1><p class="subtitle">Regional markets, price regimes and Bollinger-strategy research across global equity indices, precious metals and commodities.</p></div><div class="credit">By Murat KONUKLAR<br><span>Daily research · v4.0</span></div></div>
+<div class="heading"><div><p class="eyebrow">GLOBAL MARKET OBSERVATORY</p><h1>Global Bollinger <span>Analytics</span></h1><p class="subtitle">Regional markets, price regimes and Bollinger-strategy research across global equity indices, precious metals and commodities.</p></div><div class="credit">By Murat KONUKLAR<br><span>Daily research · v4.1</span></div></div>
 <div id="freshness" role="status"></div>
 <nav id="tabs" role="tablist" aria-label="Analysis sections"></nav>
 <section id="overview" role="tabpanel">
@@ -39,7 +39,7 @@
 <section id="commodities" role="tabpanel" hidden>
 <div class="toolbar"><label>Commodity<select id="commodityAsset"></select></label><div id="commodityPeriods" class="periods"></div></div>
 <div id="commodityInfo" class="asset-info"></div>
-<div class="notice">Price observations only: without OHLCV, ATR-stopped backtests and VWAP do not apply. Daily retrieval does not mean the source series is daily.</div>
+<div class="notice">Daily observations only — series the provider cannot supply daily are rejected (see Data Audit). Without OHLCV, ATR-stopped backtests and VWAP do not apply.</div>
 <div id="commodityChart" class="chart tall"></div>
 </section>
 <section id="risk" role="tabpanel" hidden>
@@ -60,7 +60,7 @@
 <div id="tradeTable" class="table-wrap"></div>
 </section>
 <section id="audit" role="tabpanel" hidden>
-<div class="purpose"><strong>Purpose.</strong> Data-quality audit trail: every instrument in the registry with its validation outcome and the exact rejection reason when failed. Nothing is silently substituted, proxied or filled.</div>
+<div class="purpose"><strong>Purpose.</strong> Data-quality audit trail: every instrument in the registry with its validation outcome and the exact rejection reason when failed. Nothing is silently substituted, proxied or filled. Frequency must be daily; history starts 2018-01-01.</div>
 <div class="toolbar"><label>Search asset<input id="auditSearch" placeholder="e.g. TOPIX, Gold…"></label><label>Status<select id="auditStatus"><option value="">All</option><option>PASS</option><option>PRICE_ONLY</option><option>REJECTED</option></select></label></div>
 <div id="auditTable" class="table-wrap"></div>
 </section>

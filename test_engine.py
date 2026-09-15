@@ -59,9 +59,25 @@ class EngineTests(unittest.TestCase):
     def test_first_day_return(self):
         eq=pd.DataFrame({'equity':[99000.,99000.],'exposed':[1,0]},index=pd.date_range('2020-01-01',periods=2))
         self.assertAlmostEqual(b.metrics(eq,pd.DataFrame(),self.cfg())['total_return'],-.01)
+    def _ohlc(self,idx):
+        rng=np.random.default_rng(3); close=100*np.exp(np.cumsum(rng.normal(0,.01,len(idx))))
+        return pd.DataFrame(dict(open=close,close=close,high=close*1.01,low=close*.99,volume=100.),index=idx)
+    def test_daily_frequency_enforced(self):
+        df=self._ohlc(pd.date_range('2018-01-05',periods=500,freq='W-FRI'))
+        with self.assertRaisesRegex(b.DataError,'daily'):
+            b.validate(df,self.cfg())
+    def test_daily_frequency_accepted(self):
+        df=self._ohlc(pd.bdate_range('2018-01-01',periods=800))
+        out,age=b.validate(df,self.cfg()); self.assertEqual(len(out),800)
+    def test_commodity_daily_enforced(self):
+        import commodities as cm
+        payload={'meta':{'interval':'daily','name':'X','unit':'USD'},
+                 'data':[{'date':d,'value':1.0} for d in pd.date_range('2018-01-05',periods=100,freq='W-FRI').strftime('%Y-%m-%d')]}
+        with self.assertRaisesRegex(ValueError,'COMMODITY_NOT_DAILY'):
+            cm.parse_observations(payload,'daily','2018-01-01')
     def test_html_build_smoke(self):
-        rng=np.random.default_rng(11); close=100*np.exp(np.cumsum(rng.normal(0,.008,600)))
-        d=pd.DataFrame(dict(open=close,close=close,high=close*1.01,low=close*.99,volume=100.),index=pd.bdate_range('2023-01-01',periods=600))
+        rng=np.random.default_rng(11); close=100*np.exp(np.cumsum(rng.normal(0,.008,800)))
+        d=pd.DataFrame(dict(open=close,close=close,high=close*1.01,low=close*.99,volume=100.),index=pd.bdate_range('2018-01-01',periods=800))
         u=b.universe()
         def resolved(a,records):
             if a['id']!='A01': raise b.DataError('TEST unresolved')

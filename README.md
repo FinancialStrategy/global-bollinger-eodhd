@@ -23,6 +23,10 @@ Tabbed Plotly research portal over EODHD end-of-day data: 30 global equity indic
 - `PyPortfolioOpt` — portfolio-level weights and risk (common exact dates, never filled).
 - `arch` — EGARCH conditional volatility.
 
+## Data rules
+- Daily frequency is mandatory — any series the provider cannot supply daily is rejected, never resampled or substituted.
+- History starts **2018-01-01** (cached pre-window bars are dropped at fetch).
+
 ## Policy: no fallback, no synthetic data
 - Missing `quantstats`/`PyPortfolioOpt` aborts the build with an explicit error.
 - No proxy, synthetic or filled market data anywhere in the production path.
